@@ -82,6 +82,27 @@ def test_report_limit_does_not_silently_skip_fragments():
     assert issues[0]["code"] == "grounding_size_limit"
 
 
+def test_provider_bare_judgment_list_is_normalized_before_validation():
+    events = []
+
+    async def invoke(role, messages):
+        payload = json.loads(messages[1]["content"])
+        rows = [
+            {"id": row["id"], "verdict": "supported", "evidence_ids": ["logs"], "reason": "test"}
+            for row in payload["fragments"]
+        ]
+        return {"content": json.dumps(rows)}
+
+    issues = asyncio.run(
+        check_grounding(
+            report(), {"logs": {}}, invoke, lambda *a, **k: events.append(k)
+        )
+    )
+
+    assert issues == []
+    assert len(events[0]["judgments"]) == 4
+
+
 def test_all_fields_are_included():
     assert {
         row["field"]

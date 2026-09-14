@@ -23,6 +23,17 @@ class Grounding(StrictModel):
     judgments: list[Judgment] = Field(min_length=1, max_length=4)
 
 
+def parse_grounding_response(content: str) -> Grounding:
+    """Accept the schema object and a provider's equivalent bare judgment list."""
+    text = content.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1].rsplit("```", 1)[0]
+    payload = json.loads(text)
+    if isinstance(payload, list):
+        payload = {"judgments": payload}
+    return Grounding.model_validate(payload)
+
+
 def fragments(report):
     rows = []
     for field in ("conclusion", "recommendations", "verification", "uncertainty"):
@@ -97,7 +108,8 @@ async def check_grounding(report, evidence, invoke, event):
                             "无日志或聚合指标稳定不能排除共存瓶颈，也不能证明失败请求返回路径。"
                             "检查算术和量纲：并发不能和QPS直接比较大小；相关性不是因果。"
                             "只读系统不能声称修复完成；离线规则回放不是新硬件实验。"
-                            "不要重写报告。reason不超过40字。只输出指定schema的JSON。",
+                            "不要重写报告。reason不超过40字。只输出指定schema的JSON。"
+                            "顶层必须是包含judgments字段的对象，禁止直接返回数组。",
                         },
                         {
                             "role": "user",
@@ -113,10 +125,7 @@ async def check_grounding(report, evidence, invoke, event):
                         },
                     ],
                 )
-                text = (reply.get("content") or "").strip()
-                if text.startswith("```"):
-                    text = text.split("\n", 1)[1].rsplit("```", 1)[0]
-                parsed = Grounding.model_validate_json(text)
+                parsed = parse_grounding_response(reply.get("content") or "")
                 ids = [row.id for row in parsed.judgments]
                 if sorted(ids) != [row["id"] for row in batch]:
                     raise ValueError("grounding_incomplete_coverage")
