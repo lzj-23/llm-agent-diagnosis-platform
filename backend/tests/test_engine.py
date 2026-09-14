@@ -51,6 +51,21 @@ def test_engine_rejects_fabricated_citation():
     assert result["evidence"]
 
 
+def test_engine_reports_leaf_validation_error_instead_of_exception_group():
+    class InvalidJsonModel(FakeModel):
+        async def chat(self, messages, tools=None):
+            reply = await super().chat(messages, tools)
+            if not tools:
+                reply["content"] = "not-json"
+            return reply
+
+    result = asyncio.run(
+        Engine(InvalidJsonModel()).run("排查显存", "oom-0", mode="single", semantic_review=False)
+    )
+    assert result["status"] == "needs_attention"
+    assert result["error"] == "ValidationError"
+
+
 def test_engine_persists_tool_events_callback():
     events = []
     result = asyncio.run(

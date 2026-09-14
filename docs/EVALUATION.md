@@ -2,7 +2,7 @@
 
 ## 数据与实验组
 
-`tools/fixtures.py` 生成延迟、OOM、配置错误、正常四个模板，每个有三个轻微变体。所有数据均明确 synthetic，不是从生产事故库采样。
+`tools/fixtures.py` 生成延迟、OOM、配置错误、正常四个基础模板，每个有三个轻微变体。Synthetic v2 另含96例、8种挑战场景和开发/验证/冻结分组，设计与首轮实跑见 [SYNTHETIC_DATASET.md](SYNTHETIC_DATASET.md)。所有数据均明确 synthetic，不是从生产事故库采样。
 
 single：单 Executor；multi：Planner + Executor + Reviewer；no-rag：多 Agent 禁用检索工具；no-reviewer：多 Agent 无审核。默认评测用词项检索；`neural-mcp` 是单独的 BGE/CrossEncoder 集成验证。
 
@@ -37,4 +37,4 @@ single：单 Executor；multi：Planner + Executor + Reviewer；no-rag：多 Age
 
 附加的 `judge_evaluation.py` 使用真实模型对最终报告选取最多 6 条结论论断核查，保存原始裁判输出和 quote 连续子串校验结果。`judge-summary.json` 的工具选择、参数语义、引用支持和不支持论断率都是**同模型裁判估计**，不是人工真值。开发复核见 MANUAL_REVIEW.md；两者不一致时不得挑选更好看的指标。
 
-下一步需要独立构造缺失/冲突证据、多故障混合、无日志但有延迟异常、跨模型不可比等标注集；引入真实压测事故的授权脱敏样本；双人盲评并重复多轮。这些不作为本次已完成生产验证的经历。
+已补充开发者编写的缺失遥测、冲突证据和多故障混合案例，但它们仍不是独立构造或真实事故。下一步需要引入授权脱敏的真实压测事故、第三方或双人盲评、重复多轮与跨模型测试。这些不作为本次已完成生产验证的经历。

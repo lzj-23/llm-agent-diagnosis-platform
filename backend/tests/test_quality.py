@@ -78,3 +78,12 @@ def test_numeric_comparison_between_different_units_is_flagged():
         }
     )
     assert issues[0]["code"] == "check_units"
+
+
+def test_negated_repair_claim_is_not_flagged_as_executed_repair():
+    report = {
+        "conclusion": "当前仍需验证。",
+        "recommendations": [],
+        "verification": ["离线回放不得作为已修复的依据，需重新测量。"],
+    }
+    assert not audit_report(report)

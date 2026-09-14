@@ -234,6 +234,8 @@ class Engine:
                 prompt = {
                     "role": "user",
                     "content": "仅返回符合下列 schema 的 JSON，不要 Markdown。引用只能选已有 evidence ID。"
+                    "结论和不确定性各最多4句，recommendations与verification各最多3项，"
+                    "每项只写1句，全报告最多20个句段。"
                     + json.dumps(Diagnosis.model_json_schema(), ensure_ascii=False)
                     + "\n已有证据："
                     + json.dumps(evidence, ensure_ascii=False),
@@ -331,7 +333,10 @@ class Engine:
             causes = [exc]
             while getattr(causes[0], "exceptions", None):
                 causes = list(causes[0].exceptions) + causes[1:]
-            code = next((str(e) for e in causes if isinstance(e, ModelError)), type(exc).__name__)
+            code = next(
+                (str(e) for e in causes if isinstance(e, ModelError)),
+                type(causes[0]).__name__,
+            )
             event("system", "needs_attention", error=redact(code))
             return {
                 "status": "needs_attention",
@@ -355,7 +360,9 @@ class Engine:
                         "content": SYSTEM
                         + " 这是一次质量修订，不是新实验。根据具体审计问题重新推导结论，"
                         "不要只换措辞绕过规则。保留有依据的观察，区分未知、候选原因和已验证事实。"
-                        "不得新增证据或声称执行了测量。仅返回Diagnosis schema JSON。",
+                        "不得新增证据或声称执行了测量。结论和不确定性各最多4句，"
+                        "recommendations与verification各最多3项，每项只写1句，"
+                        "全报告最多20个句段。仅返回Diagnosis schema JSON。",
                     },
                     {
                         "role": "user",

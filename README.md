@@ -4,7 +4,7 @@
 
 定位是**可运行、可评测的工程原型**，不是已经上线运营的生产诊断系统。已接入真实大模型 API；评测主要使用合成数据，另有一次本机 llama.cpp 上下文错误的复现、Agent诊断与受控复测。不能据此宣称真实生产准确率或修复收益。
 
-最新发布验收、GPU实测与尚存限制见 [RELEASE_STATUS](docs/RELEASE_STATUS.md)。早期验收文档保留为历史记录。
+最新发布验收、GPU实测与尚存限制见 [RELEASE_STATUS](docs/RELEASE_STATUS.md)。96例确定性挑战集及冻结抽样见 [SYNTHETIC_DATASET](docs/SYNTHETIC_DATASET.md)。早期验收文档保留为历史记录。
 
 - GitHub：<https://github.com/lzj-23/llm-agent-diagnosis-platform>
 - 公开回放入口：<https://lzj-23.github.io/llm-agent-diagnosis-platform/>（由Pages工作流部署，不是实时Agent）
@@ -61,11 +61,20 @@ Windows 原生轻量模式（Python 3.10–3.12，不依赖数据库服务）：
 
 这会执行 4 个场景 × 4 种配置，消耗模型额度。原始数据及局限见 [评测说明](docs/EVALUATION.md)，不预先填造质量指标。
 
+生成 Synthetic v2 数据集不调用模型；冻结抽样会调用付费模型：
+
+```powershell
+$env:PYTHONPATH='backend/src'
+.venv\Scripts\python.exe backend/scripts/generate_synthetic_dataset.py
+.venv\Scripts\python.exe backend/scripts/evaluate_synthetic_v2.py --output evaluation-results/my-synthetic-run
+```
+
 ## 目录
 
 ```text
 backend/           FastAPI、Agent、MCP、RAG、数据库与测试
-data/fixtures/     可导入的合成案例 JSON
+data/fixtures/     可导入的基础合成案例 JSON
+data/synthetic-v2/ 96例确定性挑战集、分组标签与哈希清单
 evaluation-results/ 实际运行结果；不是生产事故数据
 docs/              架构、验收、运行/演示/面试手册
 frontend/          无构建依赖的 HTML/CSS/JavaScript 工作台
