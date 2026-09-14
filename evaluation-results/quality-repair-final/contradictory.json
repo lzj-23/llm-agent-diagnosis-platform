@@ -1,0 +1,75 @@
+{
+  "id": "contradictory",
+  "original": {
+    "category": "unknown",
+    "conclusion": "平均显存很低，已排除显存不足",
+    "evidence_ids": [
+      "challenge"
+    ],
+    "recommendations": [],
+    "verification": [],
+    "uncertainty": "尚未复测"
+  },
+  "evidence": {
+    "challenge": {
+      "mean_memory_mib": 100,
+      "logs": [
+        "CUDA out of memory"
+      ]
+    }
+  },
+  "findings": [
+    {
+      "code": "unsupported_exclusion",
+      "quote": "已排除显存不足",
+      "message": "排除故障需要充分证据，日志缺失或单次指标不足以支持。"
+    }
+  ],
+  "revised": {
+    "category": "oom",
+    "conclusion": "日志明确记录 'CUDA out of memory'，表明存在显存溢出风险。平均显存低（100 MiB）可能反映服务在OOM后重启或处于空闲状态，不能据此排除显存不足问题。",
+    "evidence_ids": [
+      "challenge"
+    ],
+    "recommendations": [
+      "检查高并发或大模型加载时的峰值显存使用情况",
+      "审查导致 OOM 的具体请求参数或模型配置",
+      "监控服务重启频率以确认是否由 OOM 触发"
+    ],
+    "verification": [],
+    "uncertainty": "未提供峰值显存数据及 OOM 发生时的具体上下文，无法确定是瞬时峰值还是持续泄漏。"
+  },
+  "remaining": [],
+  "events": [
+    {
+      "role": "quality_repair",
+      "action": "revision",
+      "output": {
+        "category": "oom",
+        "conclusion": "日志明确记录 'CUDA out of memory'，表明存在显存溢出风险。平均显存低（100 MiB）可能反映服务在OOM后重启或处于空闲状态，不能据此排除显存不足问题。",
+        "evidence_ids": [
+          "challenge"
+        ],
+        "recommendations": [
+          "检查高并发或大模型加载时的峰值显存使用情况",
+          "审查导致 OOM 的具体请求参数或模型配置",
+          "监控服务重启频率以确认是否由 OOM 触发"
+        ],
+        "verification": [],
+        "uncertainty": "未提供峰值显存数据及 OOM 发生时的具体上下文，无法确定是瞬时峰值还是持续泄漏。"
+      },
+      "issues": [],
+      "accepted": true
+    }
+  ],
+  "usage": [
+    {
+      "prompt_tokens": 559,
+      "completion_tokens": 178,
+      "estimated_cny": 0.0009278000000000001,
+      "duration_ms": 6054.208399997151,
+      "attempt": 1
+    }
+  ],
+  "lint_pass": true
+}

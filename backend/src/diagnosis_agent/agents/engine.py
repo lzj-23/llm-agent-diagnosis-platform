@@ -66,6 +66,7 @@ class Engine:
         on_event=None,
         memory="",
         checkpoint=None,
+        quality_repair=True,
     ):
         question = validate_question(question)
         if case_id not in self.service.dataset:
@@ -279,6 +280,10 @@ class Engine:
                     issues=quality_issues,
                     limitation="Heuristic lint only; absence of warnings does not prove correctness.",
                 )
+                if quality_issues and quality_repair:
+                    diagnosis, quality_issues = await self.repair_report(
+                        diagnosis, evidence, quality_issues, invoke, event
+                    )
                 report_started = time.perf_counter()
                 report = await call(
                     session,
@@ -327,6 +332,51 @@ class Engine:
                 "usage": self.model.usage,
                 "duration_ms": (time.perf_counter() - start) * 1000,
             }
+
+    @classmethod
+    async def repair_report(cls, original, evidence, findings, invoke, event):
+        """One evidence-bound revision; failed revisions never replace the original."""
+        try:
+            reply = await invoke(
+                "quality_repair",
+                [
+                    {
+                        "role": "system",
+                        "content": SYSTEM
+                        + " 这是一次质量修订，不是新实验。根据具体审计问题重新推导结论，"
+                        "不要只换措辞绕过规则。保留有依据的观察，区分未知、候选原因和已验证事实。"
+                        "不得新增证据或声称执行了测量。仅返回Diagnosis schema JSON。",
+                    },
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            {
+                                "original": original.model_dump(),
+                                "findings": findings,
+                                "evidence": evidence,
+                                "schema": Diagnosis.model_json_schema(),
+                            },
+                            ensure_ascii=False,
+                        ),
+                    },
+                ],
+            )
+            candidate = cls.parse(reply.get("content") or "")
+            if not candidate.evidence_ids or not set(candidate.evidence_ids) <= evidence.keys():
+                raise ModelError("repair_unsupported_citation")
+            remaining = audit_report(candidate.model_dump())
+            event(
+                "quality_repair",
+                "revision",
+                output=candidate.model_dump(),
+                issues=remaining,
+                accepted=not remaining,
+            )
+            if not remaining:
+                return candidate, remaining
+        except (ModelError, ValueError, asyncio.TimeoutError) as exc:
+            event("quality_repair", "revision_error", error=redact(str(exc)))
+        return original, findings
 
     @staticmethod
     async def execute_tool(session, name, args):

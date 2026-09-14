@@ -1,0 +1,86 @@
+{
+  "id": "units",
+  "original": {
+    "category": "unknown",
+    "conclusion": "将并发限制为4.2 QPS",
+    "evidence_ids": [
+      "challenge"
+    ],
+    "recommendations": [],
+    "verification": [],
+    "uncertainty": "尚未复测"
+  },
+  "evidence": {
+    "challenge": {
+      "observed_qps": 4.2,
+      "concurrency": 16
+    }
+  },
+  "findings": [
+    {
+      "code": "check_units",
+      "quote": "将并发限制为4.2 QPS",
+      "message": "人工核对并发数与请求速率的量纲；两者不能直接等同。"
+    }
+  ],
+  "revised": {
+    "category": "unknown",
+    "conclusion": "将并发限制为4.2 QPS",
+    "evidence_ids": [
+      "challenge"
+    ],
+    "recommendations": [],
+    "verification": [],
+    "uncertainty": "尚未复测"
+  },
+  "remaining": [
+    {
+      "code": "check_units",
+      "quote": "将并发限制为4.2 QPS",
+      "message": "人工核对并发数与请求速率的量纲；两者不能直接等同。"
+    }
+  ],
+  "events": [
+    {
+      "role": "quality_repair",
+      "action": "revision",
+      "output": {
+        "category": "config",
+        "conclusion": "原结论存在量纲混淆错误。证据显示观测QPS为4.2，并发数为16，两者数值不等且单位不同（请求/秒 vs 请求个数），不能直接等同或互相作为阈值。当前配置下并发数远高于QPS，表明系统处于低负载或高延迟状态，而非简单的并发限制问题。需重新评估瓶颈是计算资源、网络IO还是调度策略，而非直接设定并发等于QPS。",
+        "evidence_ids": [
+          "challenge"
+        ],
+        "recommendations": [
+          "修正诊断逻辑：明确区分并发数（Concurrency）与每秒查询率（QPS）的定义及关系。",
+          "分析当前状态下（QPS=4.2, Concurrency=16）的平均响应时间，判断是否存在长尾延迟或阻塞。",
+          "检查服务日志和指标，确认是否有排队现象或资源饱和迹象，以定位真实瓶颈。"
+        ],
+        "verification": [],
+        "uncertainty": "未提供平均响应时间、CPU/内存利用率及队列深度等关键指标，无法确定导致低QPS高并发的具体根因（如慢SQL、外部依赖超时或线程池配置不当）。"
+      },
+      "issues": [
+        {
+          "code": "check_units",
+          "quote": "当前配置下并发数远高于QPS",
+          "message": "人工核对并发数与请求速率的量纲；两者不能直接等同。"
+        },
+        {
+          "code": "check_units",
+          "quote": "而非直接设定并发等于QPS",
+          "message": "人工核对并发数与请求速率的量纲；两者不能直接等同。"
+        }
+      ],
+      "accepted": false
+    }
+  ],
+  "usage": [
+    {
+      "prompt_tokens": 560,
+      "completion_tokens": 279,
+      "estimated_cny": 0.0012013000000000002,
+      "duration_ms": 6810.1506999992125,
+      "attempt": 1
+    }
+  ],
+  "lint_pass": false
+}

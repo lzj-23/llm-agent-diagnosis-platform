@@ -9,11 +9,15 @@ def audit_report(report):
     fields += [("recommendation", text) for text in report["recommendations"]]
     fields += [("verification", text) for text in report["verification"]]
     for field, text in fields:
-        for sentence in re.split(r"[。；\n]", text):
+        for sentence in re.split(r"[。；，,\n]", text):
             # Negated exclusions are caveats, not assertions of absence.
-            negated = re.search(r"(?:无法|不能|不可|不足以|不等于|尚未|未能|未).{0,8}排除", sentence)
-            planned = field != "conclusion" and re.search(
-                r"^(?:建议|需|请|监控|检查|验证|复测|观察|确认|在)", sentence.strip()
+            negated = re.search(
+                r"(?:无法|不能|不可|不足以|不等于|尚未|未能|未).{0,8}排除", sentence
+            )
+            planned = (
+                field != "conclusion"
+                and re.search(r"^(?:建议|需|请|监控|检查|验证|复测|观察|确认|在)", text.strip())
+                and not re.search(r"(?:已|已经)排除", sentence)
             )
             if (
                 not negated
@@ -35,6 +39,8 @@ def audit_report(report):
                 r"并发.{0,8}(?:限制为|设置为|控制在|等于|设为).{0,12}(?:QPS|请求/秒)",
                 sentence,
                 re.IGNORECASE,
+            ) or re.search(
+                r"并发(?:数)?.{0,4}(?:高于|低于|大于|小于)\s*QPS", sentence, re.IGNORECASE
             ):
                 findings.append(
                     {
@@ -44,7 +50,9 @@ def audit_report(report):
                     }
                 )
             if not re.search(
-                r"(?:未|没有|尚未|不能声称).{0,4}(?:修复|已修复|已解决)", sentence
+                r"(?:未|没有|尚未|不能声称).{0,4}(?:修复|已修复|已解决)"
+                r"|(?:无法|不能).{0,16}声称已修复",
+                sentence,
             ) and re.search(r"(?:已修复|修复成功|已解决故障)", sentence):
                 findings.append(
                     {

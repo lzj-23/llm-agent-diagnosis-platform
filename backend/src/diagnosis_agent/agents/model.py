@@ -96,6 +96,18 @@ class ModelClient:
                     }
                 )
                 self.failures = 0
+                if data["choices"][0].get("finish_reason") == "length":
+                    if attempt == 0 and not tools:
+                        payload["messages"] = messages + [
+                            {
+                                "role": "user",
+                                "content": "上次输出因长度上限被截断。请重新输出完整JSON，"
+                                "所有自然语言合计不超过350个汉字，每个列表最多3项。"
+                                "保持原schema必填字段和证据约束，不输出Markdown。",
+                            }
+                        ]
+                        continue
+                    raise ModelError("model_output_truncated")
                 return data["choices"][0]["message"]
             except (httpx.TimeoutException, httpx.NetworkError):
                 self.failures += 1

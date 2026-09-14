@@ -1,0 +1,79 @@
+{
+  "id": "units",
+  "original": {
+    "category": "unknown",
+    "conclusion": "将并发限制为4.2 QPS",
+    "evidence_ids": [
+      "challenge"
+    ],
+    "recommendations": [],
+    "verification": [],
+    "uncertainty": "尚未复测"
+  },
+  "evidence": {
+    "challenge": {
+      "observed_qps": 4.2,
+      "concurrency": 16
+    }
+  },
+  "findings": [
+    {
+      "code": "check_units",
+      "quote": "将并发限制为4.2 QPS",
+      "message": "人工核对并发数与请求速率的量纲；两者不能直接等同。"
+    }
+  ],
+  "revised": {
+    "category": "config",
+    "conclusion": "原结论存在量纲混淆错误。证据显示观测QPS为4.2，并发数为16，两者数值不等且单位不同（请求/秒 vs 请求个数），不能直接等同或互相作为阈值限制。当前配置下并发数远高于QPS，需重新评估限流策略是否基于正确的指标维度。",
+    "evidence_ids": [
+      "challenge"
+    ],
+    "recommendations": [
+      "修正诊断逻辑，严格区分并发数（Concurrency）与每秒查询率（QPS）的量纲。",
+      "根据实际业务负载特征，分别设定合理的最大并发连接数和QPS上限，避免混用。",
+      "检查监控面板和告警规则，确保未将并发数误标为QPS或反之。"
+    ],
+    "verification": [
+      "确认日志中'observed_qps'字段确实代表每秒请求数，'concurrency'字段代表同时处理的请求数。",
+      "验证在QPS=4.2时，系统平均并发数是否稳定在16左右，以判断是否存在长尾延迟导致的高并发低吞吐现象。"
+    ],
+    "uncertainty": "尚未测量具体的请求处理耗时分布，无法确定高并发低QPS是否由慢请求堆积引起；未复测调整后的限流效果。"
+  },
+  "remaining": [],
+  "events": [
+    {
+      "role": "quality_repair",
+      "action": "revision",
+      "output": {
+        "category": "config",
+        "conclusion": "原结论存在量纲混淆错误。证据显示观测QPS为4.2，并发数为16，两者数值不等且单位不同（请求/秒 vs 请求个数），不能直接等同或互相作为阈值限制。当前配置下并发数远高于QPS，需重新评估限流策略是否基于正确的指标维度。",
+        "evidence_ids": [
+          "challenge"
+        ],
+        "recommendations": [
+          "修正诊断逻辑，严格区分并发数（Concurrency）与每秒查询率（QPS）的量纲。",
+          "根据实际业务负载特征，分别设定合理的最大并发连接数和QPS上限，避免混用。",
+          "检查监控面板和告警规则，确保未将并发数误标为QPS或反之。"
+        ],
+        "verification": [
+          "确认日志中'observed_qps'字段确实代表每秒请求数，'concurrency'字段代表同时处理的请求数。",
+          "验证在QPS=4.2时，系统平均并发数是否稳定在16左右，以判断是否存在长尾延迟导致的高并发低吞吐现象。"
+        ],
+        "uncertainty": "尚未测量具体的请求处理耗时分布，无法确定高并发低QPS是否由慢请求堆积引起；未复测调整后的限流效果。"
+      },
+      "issues": [],
+      "accepted": true
+    }
+  ],
+  "usage": [
+    {
+      "prompt_tokens": 560,
+      "completion_tokens": 306,
+      "estimated_cny": 0.0012742,
+      "duration_ms": 7198.964200000773,
+      "attempt": 1
+    }
+  ],
+  "lint_pass": true
+}

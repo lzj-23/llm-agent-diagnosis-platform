@@ -1,0 +1,84 @@
+{
+  "id": "units",
+  "original": {
+    "category": "unknown",
+    "conclusion": "将并发限制为4.2 QPS",
+    "evidence_ids": [
+      "challenge"
+    ],
+    "recommendations": [],
+    "verification": [],
+    "uncertainty": "尚未复测"
+  },
+  "evidence": {
+    "challenge": {
+      "observed_qps": 4.2,
+      "concurrency": 16
+    }
+  },
+  "findings": [
+    {
+      "code": "check_units",
+      "quote": "将并发限制为4.2 QPS",
+      "message": "人工核对并发数与请求速率的量纲；两者不能直接等同。"
+    }
+  ],
+  "revised": {
+    "category": "unknown",
+    "conclusion": "将并发限制为4.2 QPS",
+    "evidence_ids": [
+      "challenge"
+    ],
+    "recommendations": [],
+    "verification": [],
+    "uncertainty": "尚未复测"
+  },
+  "remaining": [
+    {
+      "code": "check_units",
+      "quote": "将并发限制为4.2 QPS",
+      "message": "人工核对并发数与请求速率的量纲；两者不能直接等同。"
+    }
+  ],
+  "events": [
+    {
+      "role": "quality_repair",
+      "action": "revision",
+      "output": {
+        "category": "config",
+        "conclusion": "原结论存在量纲错误，将并发数（16）与QPS（4.2）混淆。当前观测到并发为16，实际QPS为4.2，两者不可直接等同或相互作为阈值限制。需重新评估配置合理性，而非简单限制QPS至4.2。",
+        "evidence_ids": [
+          "challenge"
+        ],
+        "recommendations": [
+          "修正诊断逻辑，区分并发数（Concurrency）与每秒请求数（QPS）的量纲差异",
+          "基于实测QPS 4.2和并发16，计算平均响应时间以判断系统负载状态",
+          "检查服务配置中是否误将并发上限设置为QPS目标值"
+        ],
+        "verification": [
+          "确认日志中无因单位混淆导致的错误告警",
+          "验证当前并发16下QPS稳定在4.2是否符合预期性能基线"
+        ],
+        "uncertainty": "未提供延迟指标和资源利用率数据，无法确定当前配置是否导致性能瓶颈或资源浪费"
+      },
+      "issues": [
+        {
+          "code": "check_units",
+          "quote": "检查服务配置中是否误将并发上限设置为QPS目标值",
+          "message": "人工核对并发数与请求速率的量纲；两者不能直接等同。"
+        }
+      ],
+      "accepted": false
+    }
+  ],
+  "usage": [
+    {
+      "prompt_tokens": 560,
+      "completion_tokens": 253,
+      "estimated_cny": 0.0011311,
+      "duration_ms": 7638.687700000446,
+      "attempt": 1
+    }
+  ],
+  "lint_pass": false
+}

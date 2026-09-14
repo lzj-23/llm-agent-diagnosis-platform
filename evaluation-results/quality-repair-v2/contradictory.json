@@ -1,0 +1,81 @@
+{
+  "id": "contradictory",
+  "original": {
+    "category": "unknown",
+    "conclusion": "平均显存很低，已排除显存不足",
+    "evidence_ids": [
+      "challenge"
+    ],
+    "recommendations": [],
+    "verification": [],
+    "uncertainty": "尚未复测"
+  },
+  "evidence": {
+    "challenge": {
+      "mean_memory_mib": 100,
+      "logs": [
+        "CUDA out of memory"
+      ]
+    }
+  },
+  "findings": [
+    {
+      "code": "unsupported_exclusion",
+      "quote": "已排除显存不足",
+      "message": "排除故障需要充分证据，日志缺失或单次指标不足以支持。"
+    }
+  ],
+  "revised": {
+    "category": "oom",
+    "conclusion": "日志明确记录 'CUDA out of memory'，表明存在显存溢出风险。平均显存低（100 MiB）可能反映服务崩溃后状态或采样偏差，不能据此排除显存不足问题。根因候选为瞬时高负载导致显存峰值超限。",
+    "evidence_ids": [
+      "challenge"
+    ],
+    "recommendations": [
+      "检查请求并发数与模型权重/激活值显存占用关系",
+      "监控显存峰值而非仅平均值",
+      "审查是否有内存泄漏或缓存未释放情况"
+    ],
+    "verification": [
+      "复现高并发场景并记录显存峰值",
+      "分析OOM发生时的具体请求参数和上下文大小"
+    ],
+    "uncertainty": "缺乏峰值显存数据和OOM发生时的详细上下文，无法确定是配置不当、流量突增还是代码缺陷导致。"
+  },
+  "remaining": [],
+  "events": [
+    {
+      "role": "quality_repair",
+      "action": "revision",
+      "output": {
+        "category": "oom",
+        "conclusion": "日志明确记录 'CUDA out of memory'，表明存在显存溢出风险。平均显存低（100 MiB）可能反映服务崩溃后状态或采样偏差，不能据此排除显存不足问题。根因候选为瞬时高负载导致显存峰值超限。",
+        "evidence_ids": [
+          "challenge"
+        ],
+        "recommendations": [
+          "检查请求并发数与模型权重/激活值显存占用关系",
+          "监控显存峰值而非仅平均值",
+          "审查是否有内存泄漏或缓存未释放情况"
+        ],
+        "verification": [
+          "复现高并发场景并记录显存峰值",
+          "分析OOM发生时的具体请求参数和上下文大小"
+        ],
+        "uncertainty": "缺乏峰值显存数据和OOM发生时的详细上下文，无法确定是配置不当、流量突增还是代码缺陷导致。"
+      },
+      "issues": [],
+      "accepted": true
+    }
+  ],
+  "usage": [
+    {
+      "prompt_tokens": 559,
+      "completion_tokens": 216,
+      "estimated_cny": 0.0010304000000000001,
+      "duration_ms": 5642.402900000889,
+      "attempt": 1
+    }
+  ],
+  "lint_pass": true
+}

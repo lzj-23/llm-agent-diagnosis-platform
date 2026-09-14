@@ -62,3 +62,40 @@ def test_auth_not_retried(tmp_path):
     with pytest.raises(ModelError, match="model_http_401"):
         asyncio.run(client.chat([]))
     assert len(attempts) == 1
+
+
+@pytest.mark.parametrize("recover", [True, False])
+def test_truncation_retries_once_and_records_both_costs(tmp_path, recover):
+    attempts = []
+
+    def handler(request):
+        attempts.append(1)
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "finish_reason": "stop" if recover and len(attempts) == 2 else "length",
+                        "message": {"role": "assistant", "content": "{}"},
+                    }
+                ],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 1200},
+            },
+        )
+
+    client = ModelClient(
+        Settings(
+            runtime_dir=str(tmp_path),
+            llm_api_key="test",
+            llm_api_base="https://example.test",
+            llm_model="test",
+            _env_file=None,
+        ),
+        httpx.MockTransport(handler),
+    )
+    if recover:
+        assert asyncio.run(client.chat([]))["content"] == "{}"
+    else:
+        with pytest.raises(ModelError, match="model_output_truncated"):
+            asyncio.run(client.chat([]))
+    assert len(attempts) == len(client.usage) == 2

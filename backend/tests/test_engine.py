@@ -93,3 +93,29 @@ def test_missing_model_tools_use_bounded_scoped_fallback():
     fallback = [e for e in result["events"] if e.get("source") == "mandatory_evidence_fallback"]
     assert len(fallback) == 3
     assert all(e["arguments"] == {"case_id": "oom-0"} for e in fallback)
+
+
+def test_engine_revision_is_reaudited_and_can_be_disabled():
+    class RevisingModel(FakeModel):
+        async def chat(self, messages, tools=None):
+            reply = await super().chat(messages, tools)
+            if not tools:
+                report = json.loads(reply["content"])
+                is_revision = "这是一次质量修订" in messages[0]["content"]
+                report["conclusion"] = (
+                    "证据不足，无法排除OOM风险" if is_revision else "已排除OOM风险"
+                )
+                reply["content"] = json.dumps(report)
+            return reply
+
+    for enabled in (True, False):
+        result = asyncio.run(
+            Engine(RevisingModel()).run("检查显存", "oom-0", mode="single", quality_repair=enabled)
+        )
+        assert result["status"] == ("completed" if enabled else "needs_attention")
+        revisions = [e for e in result["events"] if e["action"] == "revision"]
+        assert len(revisions) == int(enabled)
+        assert any(
+            e["action"] == "draft" and "已排除" in e["output"]["conclusion"]
+            for e in result["events"]
+        )

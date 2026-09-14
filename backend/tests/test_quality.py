@@ -46,3 +46,35 @@ def test_not_equivalent_to_exclusion_is_a_caveat():
     assert not audit_report(
         {"conclusion": "排队存在不等于已排除计算瓶颈", "recommendations": [], "verification": []}
     )
+
+
+def test_caveat_in_later_clause_cannot_hide_exclusion():
+    issues = audit_report(
+        {
+            "conclusion": "指标稳定排除了当前场景下的计算瓶颈，但不能完全排除潜在配置隐患",
+            "recommendations": [],
+            "verification": [],
+        }
+    )
+    assert issues[0]["code"] == "unsupported_exclusion"
+
+
+def test_denial_of_repair_claim_is_not_repair_claim():
+    assert not audit_report(
+        {
+            "conclusion": "平台无自动修复权限，因此无法确认故障状态或声称已修复",
+            "recommendations": [],
+            "verification": [],
+        }
+    )
+
+
+def test_numeric_comparison_between_different_units_is_flagged():
+    issues = audit_report(
+        {
+            "conclusion": "当前配置下并发数远高于QPS",
+            "recommendations": [],
+            "verification": [],
+        }
+    )
+    assert issues[0]["code"] == "check_units"

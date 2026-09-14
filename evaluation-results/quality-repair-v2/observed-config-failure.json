@@ -1,0 +1,218 @@
+{
+  "id": "observed-config-failure",
+  "original": {
+    "category": "config",
+    "conclusion": "根因候选为服务配置 max_model_len=2048 与客户端实际输入长度 32768 不匹配，导致请求在入口长度校验阶段被拒。日志明确报错 input length 32768 exceeds max_model_len 2048；对比数据显示 context_size 由 2048 升至 32768 但 max_model_len 未同步上调，成功率由 1.0 降至 0.5（Δ=-0.5）。TTFT、E2E、吞吐及显存峰值均无变化（Δ=0，显存稳定 9000 MiB），且无 OOM/排队日志，排除计算瓶颈与显存不足，失败发生在配置校验环节。replay 仅离线规则检查，未产生新硬件测量数据。",
+    "evidence_ids": [
+      "config-0:logs",
+      "config-0:metrics",
+      "config-0:comparison",
+      "config-0:replay",
+      "doc-config"
+    ],
+    "recommendations": [
+      "将服务端 max_model_len 上调至 ≥32768，并确认模型本身支持该上下文长度",
+      "若业务允许，限制客户端输入长度不超过当前服务上限",
+      "上调 max_model_len 后重新压测，观察 gpu_memory_peak_mib 与成功率，长上下文+并发可能带来新的显存风险",
+      "如出现显存压力，再评估降低 max_num_seqs 或 gpu_memory_utilization"
+    ],
+    "verification": [
+      "调整 max_model_len 后用控制变量法复测：保持模型、并发、输入不变，确认 success_rate 恢复至 1.0",
+      "复测时监控 ttft_p95/e2e_p95/request_throughput/gpu_memory_peak_mib，确认无延迟退化或 OOM",
+      "核对错误日志不再出现 exceeds max_model_len 类拒绝信息"
+    ],
+    "uncertainty": "现有证据为相关性，因果需通过控制变量复测确认；指标数据标记为 synthetic，真实环境表现可能不同。提高 max_model_len 后的 KV cache 显存开销尚未实测，存在触发新显存瓶颈的风险，不能据此声称已修复。"
+  },
+  "evidence": {
+    "config-0:logs": {
+      "evidence_id": "config-0:logs",
+      "logs": [
+        {
+          "timestamp": "2026-01-01T00:00:01Z",
+          "level": "ERROR",
+          "message": "input length 32768 exceeds max_model_len 2048"
+        }
+      ],
+      "counts": {
+        "ERROR": 1
+      }
+    },
+    "config-0:metrics": {
+      "evidence_id": "config-0:metrics",
+      "synthetic": true,
+      "baseline": {
+        "id": "baseline",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 2048,
+        "concurrency": 4,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 0.4,
+          "e2e_p95_seconds": 2.0,
+          "request_throughput_per_second": 4.0,
+          "success_rate": 1.0,
+          "gpu_memory_peak_mib": 9000.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8
+        }
+      },
+      "current": {
+        "id": "current",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 32768,
+        "concurrency": 4,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 0.4,
+          "e2e_p95_seconds": 2.0,
+          "request_throughput_per_second": 4.0,
+          "success_rate": 0.5,
+          "gpu_memory_peak_mib": 9000.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8,
+          "max_model_len": 2048
+        }
+      }
+    },
+    "config-0:comparison": {
+      "evidence_id": "config-0:comparison",
+      "changed_conditions": {
+        "context_size": {
+          "before": 2048,
+          "after": 32768
+        },
+        "config": {
+          "before": {
+            "max_num_seqs": 16,
+            "gpu_memory_utilization": 0.8
+          },
+          "after": {
+            "max_num_seqs": 16,
+            "gpu_memory_utilization": 0.8,
+            "max_model_len": 2048
+          }
+        }
+      },
+      "deltas": {
+        "ttft_p95_seconds": 0.0,
+        "e2e_p95_seconds": 0.0,
+        "request_throughput_per_second": 0.0,
+        "success_rate": -0.5,
+        "gpu_memory_peak_mib": 0.0
+      },
+      "comparable": true,
+      "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+    },
+    "config-0:replay": {
+      "evidence_id": "config-0:replay",
+      "mode": "offline_rule_replay",
+      "observations": [
+        "config"
+      ],
+      "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+    },
+    "doc-config": {
+      "id": "doc-config",
+      "title": "配置与输入长度排查笔记",
+      "url": "local://runbooks/config",
+      "text": "max_model_len context input length 配置 上下文。输入长度超过配置上限会请求失败。先核对实际输入、模型支持长度和服务上限，再调整输入长度，验证成功率与内存开销。",
+      "score": 2.2572
+    },
+    "doc-memory": {
+      "id": "doc-memory",
+      "title": "显存故障排查笔记",
+      "url": "local://runbooks/memory",
+      "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+      "score": 0.5185
+    },
+    "doc-torch-fragmentation": {
+      "id": "doc-torch-fragmentation",
+      "title": "PyTorch 碎片诊断不能只看峰值",
+      "url": "https://docs.pytorch.org/docs/2.12/notes/cuda.html#optimizing-memory-usage-with-pytorch-alloc-conf",
+      "version": "PyTorch 2.12",
+      "checked_at": "2026-09-14",
+      "text": "memory_stats、memory_summary和memory_snapshot用于了解分配模式。max_split_size_mb是native分配器的最后手段，仅在OOM伴随大量inactive split blocks时评估；cudaMallocAsync忽略该设置，且调整可能影响性能。",
+      "score": 0.3974
+    }
+  },
+  "findings": [
+    {
+      "code": "unsupported_exclusion",
+      "quote": "排除计算瓶颈与显存不足",
+      "message": "排除故障需要充分证据，日志缺失或单次指标不足以支持。"
+    }
+  ],
+  "revised": {
+    "category": "config",
+    "conclusion": "根因候选为服务配置 max_model_len=2048 与客户端实际输入长度 32768 不匹配，导致请求在入口长度校验阶段被拒。日志明确报错 input length 32768 exceeds max_model_len 2048；对比数据显示 context_size 由 2048 升至 32768 但 max_model_len 未同步上调，成功率由 1.0 降至 0.5（Δ=-0.5）。TTFT、E2E、吞吐及显存峰值均无变化（Δ=0，显存稳定 9000 MiB），且无 OOM/排队日志，表明失败发生在配置校验环节而非计算或显存瓶颈。replay 仅离线规则检查，未产生新硬件测量数据。",
+    "evidence_ids": [
+      "config-0:logs",
+      "config-0:metrics",
+      "config-0:comparison",
+      "config-0:replay",
+      "doc-config"
+    ],
+    "recommendations": [
+      "将服务端 max_model_len 上调至 ≥32768，并确认模型本身支持该上下文长度",
+      "若业务允许，限制客户端输入长度不超过当前服务上限",
+      "上调 max_model_len 后重新压测，观察 gpu_memory_peak_mib 与成功率，长上下文+并发可能带来新的显存风险",
+      "如出现显存压力，再评估降低 max_num_seqs 或 gpu_memory_utilization"
+    ],
+    "verification": [
+      "调整 max_model_len 后用控制变量法复测：保持模型、并发、输入不变，确认 success_rate 恢复至 1.0",
+      "复测时监控 ttft_p95/e2e_p95/request_throughput/gpu_memory_peak_mib，确认无延迟退化或 OOM",
+      "核对错误日志不再出现 exceeds max_model_len 类拒绝信息"
+    ],
+    "uncertainty": "现有证据为相关性，因果需通过控制变量复测确认；指标数据标记为 synthetic，真实环境表现可能不同。提高 max_model_len 后的 KV cache 显存开销尚未实测，存在触发新显存瓶颈的风险，不能据此声称已修复。"
+  },
+  "remaining": [],
+  "events": [
+    {
+      "role": "quality_repair",
+      "action": "revision",
+      "output": {
+        "category": "config",
+        "conclusion": "根因候选为服务配置 max_model_len=2048 与客户端实际输入长度 32768 不匹配，导致请求在入口长度校验阶段被拒。日志明确报错 input length 32768 exceeds max_model_len 2048；对比数据显示 context_size 由 2048 升至 32768 但 max_model_len 未同步上调，成功率由 1.0 降至 0.5（Δ=-0.5）。TTFT、E2E、吞吐及显存峰值均无变化（Δ=0，显存稳定 9000 MiB），且无 OOM/排队日志，表明失败发生在配置校验环节而非计算或显存瓶颈。replay 仅离线规则检查，未产生新硬件测量数据。",
+        "evidence_ids": [
+          "config-0:logs",
+          "config-0:metrics",
+          "config-0:comparison",
+          "config-0:replay",
+          "doc-config"
+        ],
+        "recommendations": [
+          "将服务端 max_model_len 上调至 ≥32768，并确认模型本身支持该上下文长度",
+          "若业务允许，限制客户端输入长度不超过当前服务上限",
+          "上调 max_model_len 后重新压测，观察 gpu_memory_peak_mib 与成功率，长上下文+并发可能带来新的显存风险",
+          "如出现显存压力，再评估降低 max_num_seqs 或 gpu_memory_utilization"
+        ],
+        "verification": [
+          "调整 max_model_len 后用控制变量法复测：保持模型、并发、输入不变，确认 success_rate 恢复至 1.0",
+          "复测时监控 ttft_p95/e2e_p95/request_throughput/gpu_memory_peak_mib，确认无延迟退化或 OOM",
+          "核对错误日志不再出现 exceeds max_model_len 类拒绝信息"
+        ],
+        "uncertainty": "现有证据为相关性，因果需通过控制变量复测确认；指标数据标记为 synthetic，真实环境表现可能不同。提高 max_model_len 后的 KV cache 显存开销尚未实测，存在触发新显存瓶颈的风险，不能据此声称已修复。"
+      },
+      "issues": [],
+      "accepted": true
+    }
+  ],
+  "usage": [
+    {
+      "prompt_tokens": 1972,
+      "completion_tokens": 508,
+      "estimated_cny": 0.0029492000000000003,
+      "duration_ms": 6011.0682000013185,
+      "attempt": 1
+    }
+  ],
+  "lint_pass": true
+}
