@@ -17,6 +17,12 @@ release-smoke为代码冻结后的4任务验收，manifest记录源代码SHA256�
 
 ## 公开发布与隐私
 
+2026-09-14：公开仓库及静态回放已发布并实际打开验证。首次发布提交b97e3dd的GitHub Actions checks（34855524783）和replay-pages（34855524781）均成功。Windows与干净Linux容器各42项测试通过；Linux原始结果见evaluation-results/release-smoke/container-tests.xml。最终神经检索容器的端到端任务完成，记录见evaluation-results/release-neural；该任务使用合成OOM案例、真实检索与模型调用，不是真实GPU OOM事故。
+
+- 仓库：https://github.com/lzj-23/llm-agent-diagnosis-platform
+- 静态回放：https://lzj-23.github.io/llm-agent-diagnosis-platform/
+- 最新提交的测试状态以仓库Actions为准；上述运行编号对应首次发布，不冒充后续提交的测试记录。
+
 用户已授权公开仓库及官方GitHub CLI登录。发布使用GitHub隐私邮箱和干净的发布快照，避免把原开发提交中的私人邮箱公开。本地main保留实际开发历史；公开快照不伪造过往提交时间或开发次数。runtime、本机.env、权重和未脱敏服务日志均不发布。
 
 ## 仍不宣称的能力
