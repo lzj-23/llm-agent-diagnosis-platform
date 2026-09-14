@@ -43,7 +43,9 @@ class FakeModel:
 
 
 def test_engine_rejects_fabricated_citation():
-    result = asyncio.run(Engine(FakeModel(True)).run("排查显存", "oom-0", mode="single"))
+    result = asyncio.run(
+        Engine(FakeModel(True)).run("排查显存", "oom-0", mode="single", semantic_review=False)
+    )
     assert result["status"] == "needs_attention"
     assert result["error"] == "unsupported_citation"
     assert result["evidence"]
@@ -52,7 +54,9 @@ def test_engine_rejects_fabricated_citation():
 def test_engine_persists_tool_events_callback():
     events = []
     result = asyncio.run(
-        Engine(FakeModel()).run("排查显存", "oom-0", mode="single", on_event=events.append)
+        Engine(FakeModel()).run(
+            "排查显存", "oom-0", mode="single", on_event=events.append, semantic_review=False
+        )
     )
     assert result["status"] == "completed"
     assert [e["tool"] for e in events if e["action"] == "tool"] == [
@@ -74,7 +78,9 @@ def test_engine_retains_flagged_report_for_human_review():
                 reply["content"] = json.dumps(report)
             return reply
 
-    result = asyncio.run(Engine(UnsafeReportModel()).run("检查显存", "oom-0", mode="single"))
+    result = asyncio.run(
+        Engine(UnsafeReportModel()).run("检查显存", "oom-0", mode="single", semantic_review=False)
+    )
     assert result["status"] == "needs_attention"
     assert result["diagnosis"]
     assert result["quality_issues"][0]["code"] == "unsupported_exclusion"
@@ -88,7 +94,9 @@ def test_missing_model_tools_use_bounded_scoped_fallback():
                 return {"role": "assistant", "content": "没有调用工具"}
             return await super().chat(messages, tools)
 
-    result = asyncio.run(Engine(NoToolsModel()).run("检查显存", "oom-0", mode="single"))
+    result = asyncio.run(
+        Engine(NoToolsModel()).run("检查显存", "oom-0", mode="single", semantic_review=False)
+    )
     assert result["status"] == "completed"
     fallback = [e for e in result["events"] if e.get("source") == "mandatory_evidence_fallback"]
     assert len(fallback) == 3
@@ -110,7 +118,9 @@ def test_engine_revision_is_reaudited_and_can_be_disabled():
 
     for enabled in (True, False):
         result = asyncio.run(
-            Engine(RevisingModel()).run("检查显存", "oom-0", mode="single", quality_repair=enabled)
+            Engine(RevisingModel()).run(
+                "检查显存", "oom-0", mode="single", quality_repair=enabled, semantic_review=False
+            )
         )
         assert result["status"] == ("completed" if enabled else "needs_attention")
         revisions = [e for e in result["events"] if e["action"] == "revision"]
@@ -119,3 +129,39 @@ def test_engine_revision_is_reaudited_and_can_be_disabled():
             e["action"] == "draft" and "已排除" in e["output"]["conclusion"]
             for e in result["events"]
         )
+
+
+def test_default_grounding_gate_is_enforced_after_revision():
+    class GroundedModel(FakeModel):
+        def __init__(self, unsupported):
+            super().__init__()
+            self.unsupported = unsupported
+
+        async def chat(self, messages, tools=None):
+            if "你是证据核对器" in messages[0]["content"]:
+                payload = json.loads(messages[1]["content"])
+                return {
+                    "content": json.dumps(
+                        {
+                            "judgments": [
+                                {
+                                    "id": row["id"],
+                                    "verdict": "unsupported" if self.unsupported else "hypothesis",
+                                    "evidence_ids": [],
+                                    "reason": "test audit",
+                                }
+                                for row in payload["fragments"]
+                            ]
+                        }
+                    )
+                }
+            return await super().chat(messages, tools)
+
+    for unsupported in (True, False):
+        result = asyncio.run(
+            Engine(GroundedModel(unsupported)).run("检查显存", "oom-0", mode="single")
+        )
+        assert result["status"] == ("needs_attention" if unsupported else "completed")
+        audits = [event for event in result["events"] if event["action"] == "grounding_audit"]
+        assert len(audits) == (2 if unsupported else 1)
+        assert result["diagnosis"] and result["report"]

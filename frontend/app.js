@@ -32,10 +32,21 @@ async function watch(id){
     const result=r.result||{};const d=result.diagnosis;
     $('report').replaceChildren();
     if(d){
-      (result.quality_issues||[]).forEach(issue=>$('report').append(text('p','需人工核对：'+issue.message+' 原句：'+issue.quote,'issue')));
+      (result.quality_issues||[]).forEach(issue=>$('report').append(text('p','需人工核对：'+issue.message+(issue.quote?' 原句：'+issue.quote:''),'issue')));
       $('report').append(text('p',d.conclusion,'reportText'));
       [['建议',d.recommendations],['验证步骤',d.verification]].forEach(([title,items])=>{ $('report').append(text('h3',title));const ul=document.createElement('ul');(items||[]).forEach(i=>ul.append(text('li',i)));$('report').append(ul);});
       $('report').append(text('p',d.uncertainty,'issue'));
+      const audit=(r.events||[]).filter(e=>e.action==='grounding_audit').at(-1);
+      if(audit){
+        $('report').append(text('h3','逐条证据核对'),text('p','模型辅助判断，不代表结论已被证明；无结果的片段需要人工核对。','muted'));
+        const table=document.createElement('table');const head=document.createElement('tr');
+        ['报告片段','核对结果','证据 / 原因'].forEach(v=>head.append(text('th',v)));table.append(head);
+        (audit.fragments||[]).forEach(fragment=>{
+          const judgment=(audit.judgments||[]).find(j=>j.id===fragment.id);const row=document.createElement('tr');
+          const label=judgment?({supported:'有直接支持',hypothesis:'假设 / 待验证',unsupported:'支持不足'}[judgment.verdict]):'未完成核对';
+          [fragment.text,label,judgment?(judgment.evidence_ids.join(', ')+' '+judgment.reason):'需人工核对'].forEach(v=>row.append(text('td',v)));table.append(row);
+        });$('report').append(table);
+      }
       const usage=result.usage||[];const cost=usage.reduce((s,u)=>s+u.estimated_cny,0);
       $('report').append(text('span','耗时 '+(result.duration_ms/1000).toFixed(1)+' 秒','stat'),text('span','模型估算费用 ¥'+cost.toFixed(4),'stat'));
     }else $('report').append(text('p',result.error||'正在分析，已收集证据会保留。','muted'));

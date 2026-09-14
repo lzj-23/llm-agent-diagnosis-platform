@@ -18,6 +18,11 @@ def load(name):
 records = {
     "cases": [
         {
+            "title": "新增：逐条证据核对",
+            "kind": "合成OOM案例，实际模型与神经检索；核对标签不代表结论已被证明",
+            "result": load("grounding-neural/task.json")["result"],
+        },
+        {
             "title": "本机上下文超限：实测错误",
             "kind": "真实CPU小模型实验，不是生产事故",
             "result": load("measured-context/diagnosis.json"),
@@ -33,4 +38,4 @@ records = {
 (output / "records.json").write_text(
     json.dumps(records, ensure_ascii=False), encoding="utf-8"
 )
-print("Built static replay from three explicit public evaluation files.")
+print("Built static replay from four explicit public evaluation files.")

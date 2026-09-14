@@ -6,6 +6,7 @@ from typing import Literal
 from opentelemetry import trace
 from pydantic import Field
 
+from diagnosis_agent.agents.grounding import check_grounding
 from diagnosis_agent.agents.model import ModelClient, ModelError
 from diagnosis_agent.agents.quality import audit_report
 from diagnosis_agent.config import get_settings
@@ -67,6 +68,7 @@ class Engine:
         memory="",
         checkpoint=None,
         quality_repair=True,
+        semantic_review=True,
     ):
         question = validate_question(question)
         if case_id not in self.service.dataset:
@@ -280,10 +282,18 @@ class Engine:
                     issues=quality_issues,
                     limitation="Heuristic lint only; absence of warnings does not prove correctness.",
                 )
+                if semantic_review:
+                    quality_issues += await check_grounding(
+                        diagnosis.model_dump(), evidence, invoke, event
+                    )
                 if quality_issues and quality_repair:
                     diagnosis, quality_issues = await self.repair_report(
                         diagnosis, evidence, quality_issues, invoke, event
                     )
+                    if semantic_review and not quality_issues:
+                        quality_issues = await check_grounding(
+                            diagnosis.model_dump(), evidence, invoke, event
+                        )
                 report_started = time.perf_counter()
                 report = await call(
                     session,
