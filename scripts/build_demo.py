@@ -1,5 +1,6 @@
 """Build an allowlisted static replay; never package runtime, backend env, or user uploads."""
 
+import csv
 import json
 import shutil
 from pathlib import Path
@@ -13,6 +14,11 @@ for name in ("index.html", "app.js"):
 
 def load(name):
     return json.loads((root / "evaluation-results" / name).read_text(encoding="utf-8"))
+
+
+def load_csv(name):
+    with (root / "evaluation-results" / name).open(encoding="utf-8-sig", newline="") as file:
+        return list(csv.DictReader(file))
 
 
 records = {
@@ -34,8 +40,12 @@ records = {
         },
     ],
     "retest": load("gpu-context-v2/retest.json"),
+    "synthetic": {
+        "manifest": load("synthetic-v2-frozen-smoke-v2/manifest.json"),
+        "rows": load_csv("synthetic-v2-frozen-smoke-v2/results.csv"),
+    },
 }
 (output / "records.json").write_text(
     json.dumps(records, ensure_ascii=False), encoding="utf-8"
 )
-print("Built static replay from four explicit public evaluation files.")
+print("Built static replay from allowlisted public evaluation files.")
