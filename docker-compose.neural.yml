@@ -1,0 +1,16 @@
+# Set EMBEDDING_MODEL_DIR and RERANKER_MODEL_DIR to local model snapshot directories.
+# Model files are mounted read-only, never included in the image or repository.
+services:
+  app:
+    build:
+      context: .
+      args:
+        ENABLE_NEURAL: "1"
+    environment:
+      RAG_BACKEND: neural
+      EMBEDDING_MODEL: /models/embedding
+      RERANKER_MODEL: /models/reranker
+      HF_HUB_OFFLINE: "1"
+    volumes:
+      - ${EMBEDDING_MODEL_DIR:?Set the embedding snapshot directory}:/models/embedding:ro
+      - ${RERANKER_MODEL_DIR:?Set the reranker snapshot directory}:/models/reranker:ro

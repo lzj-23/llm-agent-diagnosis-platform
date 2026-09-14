@@ -1,0 +1,624 @@
+{
+  "status": "completed",
+  "diagnosis": {
+    "category": "latency",
+    "conclusion": "并发从4升至32后，P95延迟显著上升（E2E +5.0s, TTFT +2.6s），但吞吐仅微增（+0.2 req/s）。日志显示调度器队列等待请求数为28，结合配置中max_num_seqs=16的限制，表明系统已饱和。额外并发未转化为处理能力，而是导致大量请求在调度器排队，从而引发高延迟。GPU显存峰值无变化，排除OOM风险。根因候选为max_num_seqs配置过低导致的排队瓶颈。",
+    "evidence_ids": [
+      "latency-0:logs",
+      "latency-0:metrics",
+      "latency-0:comparison"
+    ],
+    "recommendations": [
+      "评估并适当调大 max_num_seqs 参数以匹配目标并发量",
+      "监控调度器队列深度与运行中序列数，确认资源利用率",
+      "检查 GPU 计算单元是否成为新的瓶颈（如 SM 利用率）",
+      "考虑实施动态批处理或请求限流策略以平滑负载"
+    ],
+    "verification": [
+      "保持并发为32，将 max_num_seqs 调整为32或更高，复测 P95 延迟与吞吐",
+      "逐步增加并发（4->8->16->24->32），绘制吞吐-延迟曲线以定位饱和拐点",
+      "对比调整前后 scheduler queue waiting requests 指标的变化"
+    ],
+    "uncertainty": "当前证据基于相关性分析，尚未通过控制变量实验证实 max_num_seqs 是唯一或主要根因。需复测确认因果，并排除其他潜在因素（如网络抖动、后端存储IO等）。"
+  },
+  "report": {
+    "case_id": "latency-0",
+    "conclusion": "并发从4升至32后，P95延迟显著上升（E2E +5.0s, TTFT +2.6s），但吞吐仅微增（+0.2 req/s）。日志显示调度器队列等待请求数为28，结合配置中max_num_seqs=16的限制，表明系统已饱和。额外并发未转化为处理能力，而是导致大量请求在调度器排队，从而引发高延迟。GPU显存峰值无变化，排除OOM风险。根因候选为max_num_seqs配置过低导致的排队瓶颈。",
+    "evidence_ids": [
+      "latency-0:logs",
+      "latency-0:metrics",
+      "latency-0:comparison"
+    ],
+    "recommendations": [
+      "评估并适当调大 max_num_seqs 参数以匹配目标并发量",
+      "监控调度器队列深度与运行中序列数，确认资源利用率",
+      "检查 GPU 计算单元是否成为新的瓶颈（如 SM 利用率）",
+      "考虑实施动态批处理或请求限流策略以平滑负载"
+    ],
+    "synthetic": true,
+    "status": "candidate_diagnosis"
+  },
+  "evidence": {
+    "latency-0:logs": {
+      "evidence_id": "latency-0:logs",
+      "logs": [
+        {
+          "timestamp": "2026-01-01T00:00:01Z",
+          "level": "WARNING",
+          "message": "scheduler queue waiting requests=28"
+        }
+      ],
+      "counts": {
+        "WARNING": 1
+      }
+    },
+    "latency-0:metrics": {
+      "evidence_id": "latency-0:metrics",
+      "synthetic": true,
+      "baseline": {
+        "id": "baseline",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 2048,
+        "concurrency": 4,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 0.4,
+          "e2e_p95_seconds": 2.0,
+          "request_throughput_per_second": 4.0,
+          "success_rate": 1.0,
+          "gpu_memory_peak_mib": 9000.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8
+        }
+      },
+      "current": {
+        "id": "current",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 2048,
+        "concurrency": 32,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 3.0,
+          "e2e_p95_seconds": 7.0,
+          "request_throughput_per_second": 4.2,
+          "success_rate": 1.0,
+          "gpu_memory_peak_mib": 9000.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8
+        }
+      }
+    },
+    "latency-0:comparison": {
+      "evidence_id": "latency-0:comparison",
+      "changed_conditions": {
+        "concurrency": {
+          "before": 4,
+          "after": 32
+        }
+      },
+      "deltas": {
+        "ttft_p95_seconds": 2.6,
+        "e2e_p95_seconds": 5.0,
+        "request_throughput_per_second": 0.20000000000000018,
+        "success_rate": 0.0,
+        "gpu_memory_peak_mib": 0.0
+      },
+      "comparable": true,
+      "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+    }
+  },
+  "events": [
+    {
+      "seq": 1,
+      "role": "system",
+      "action": "running",
+      "mode": "multi"
+    },
+    {
+      "seq": 2,
+      "role": "planner",
+      "action": "plan",
+      "output": "针对 case_id=latency-0，排查并发升高导致 P95 延迟上升的问题，制定以下4步排查计划：\n\n1. **确认排队与资源饱和状态**\n   - **动作**：查询网关/负载均衡器及推理服务实例的队列长度、等待时间指标，以及 CPU/GPU 利用率。\n   - **所需证据**：高并发时段的 `queue_depth`（队列深度）、`wait_time_ms`（等待耗时）趋势图；计算资源是否接近 100% 饱和。\n\n2. **分析吞吐与延迟的相关性**\n   - **动作**：对比 QPS（每秒查询率）与 P95/P99 延迟的变化曲线，检查是否存在吞吐瓶颈或非线性退化。\n   - **所需证据**：同一时间窗口内的 `QPS` vs `P95_Latency` 散点图或双轴折线图；确认延迟上升是否伴随吞吐停滞或下降。\n\n3. **检查后端处理阶段耗时分布**\n   - **动作**：拆解请求生命周期，区分网络传输、排队等待、模型前向推理（Inference）和后处理各阶段的耗时占比变化。\n   - **所需证据**：分布式追踪（Tracing）数据或分段计时日志，显示在高并发下哪一阶段（特别是 Inference 或 Queue）耗时显著增加。\n\n4. **验证配置与扩缩容行为**\n   - **动作**：检查自动扩缩容（HPA/VPA）事件日志及关键配置参数（如最大并发数、批处理大小 Batch Size）。\n   - **所需证据**：扩缩容触发记录（是否有滞后或未触发）；当前 `max_concurrency` 或 `batch_size` 设置是否成为硬限制导致请求堆积。"
+    },
+    {
+      "seq": 3,
+      "role": "system",
+      "action": "mcp_connected",
+      "tools": [
+        "query_logs",
+        "query_metrics",
+        "compare_runs",
+        "replay_case",
+        "search_docs",
+        "generate_report"
+      ]
+    },
+    {
+      "seq": 4,
+      "role": "executor",
+      "action": "tool",
+      "tool": "query_logs",
+      "arguments": {
+        "case_id": "latency-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "latency-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "WARNING",
+              "message": "scheduler queue waiting requests=28"
+            }
+          ],
+          "counts": {
+            "WARNING": 1
+          }
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.590799999074079,
+      "evidence": {
+        "latency-0:logs": {
+          "evidence_id": "latency-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "WARNING",
+              "message": "scheduler queue waiting requests=28"
+            }
+          ],
+          "counts": {
+            "WARNING": 1
+          }
+        },
+        "latency-0:metrics": {
+          "evidence_id": "latency-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 32,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 3.0,
+              "e2e_p95_seconds": 7.0,
+              "request_throughput_per_second": 4.2,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "latency-0:comparison": {
+          "evidence_id": "latency-0:comparison",
+          "changed_conditions": {
+            "concurrency": {
+              "before": 4,
+              "after": 32
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 2.6,
+            "e2e_p95_seconds": 5.0,
+            "request_throughput_per_second": 0.20000000000000018,
+            "success_rate": 0.0,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        }
+      }
+    },
+    {
+      "seq": 5,
+      "role": "executor",
+      "action": "tool",
+      "tool": "query_metrics",
+      "arguments": {
+        "case_id": "latency-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "latency-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 32,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 3.0,
+              "e2e_p95_seconds": 7.0,
+              "request_throughput_per_second": 4.2,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.625199999078177,
+      "evidence": {
+        "latency-0:logs": {
+          "evidence_id": "latency-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "WARNING",
+              "message": "scheduler queue waiting requests=28"
+            }
+          ],
+          "counts": {
+            "WARNING": 1
+          }
+        },
+        "latency-0:metrics": {
+          "evidence_id": "latency-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 32,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 3.0,
+              "e2e_p95_seconds": 7.0,
+              "request_throughput_per_second": 4.2,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "latency-0:comparison": {
+          "evidence_id": "latency-0:comparison",
+          "changed_conditions": {
+            "concurrency": {
+              "before": 4,
+              "after": 32
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 2.6,
+            "e2e_p95_seconds": 5.0,
+            "request_throughput_per_second": 0.20000000000000018,
+            "success_rate": 0.0,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "role": "executor",
+      "action": "tool",
+      "tool": "compare_runs",
+      "arguments": {
+        "case_id": "latency-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "latency-0:comparison",
+          "changed_conditions": {
+            "concurrency": {
+              "before": 4,
+              "after": 32
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 2.6,
+            "e2e_p95_seconds": 5.0,
+            "request_throughput_per_second": 0.20000000000000018,
+            "success_rate": 0.0,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.2715999986976385,
+      "evidence": {
+        "latency-0:logs": {
+          "evidence_id": "latency-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "WARNING",
+              "message": "scheduler queue waiting requests=28"
+            }
+          ],
+          "counts": {
+            "WARNING": 1
+          }
+        },
+        "latency-0:metrics": {
+          "evidence_id": "latency-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 32,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 3.0,
+              "e2e_p95_seconds": 7.0,
+              "request_throughput_per_second": 4.2,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "latency-0:comparison": {
+          "evidence_id": "latency-0:comparison",
+          "changed_conditions": {
+            "concurrency": {
+              "before": 4,
+              "after": 32
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 2.6,
+            "e2e_p95_seconds": 5.0,
+            "request_throughput_per_second": 0.20000000000000018,
+            "success_rate": 0.0,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "role": "executor",
+      "action": "draft",
+      "output": {
+        "category": "latency",
+        "conclusion": "并发从4升至32后，P95延迟显著上升（E2E +5.0s, TTFT +2.6s），但吞吐仅微增（+0.2 req/s）。日志显示调度器队列等待请求数为28，结合配置中max_num_seqs=16的限制，表明系统已饱和。额外并发未转化为处理能力，而是导致大量请求在调度器排队，从而引发高延迟。GPU显存峰值无变化，排除OOM风险。根因候选为max_num_seqs配置过低导致的排队瓶颈。",
+        "evidence_ids": [
+          "latency-0:logs",
+          "latency-0:metrics",
+          "latency-0:comparison"
+        ],
+        "recommendations": [
+          "评估并适当调大 max_num_seqs 参数以匹配目标并发量",
+          "监控调度器队列深度与运行中序列数，确认资源利用率",
+          "检查 GPU 计算单元是否成为新的瓶颈（如 SM 利用率）",
+          "考虑实施动态批处理或请求限流策略以平滑负载"
+        ],
+        "verification": [
+          "保持并发为32，将 max_num_seqs 调整为32或更高，复测 P95 延迟与吞吐",
+          "逐步增加并发（4->8->16->24->32），绘制吞吐-延迟曲线以定位饱和拐点",
+          "对比调整前后 scheduler queue waiting requests 指标的变化"
+        ],
+        "uncertainty": "当前证据基于相关性分析，尚未通过控制变量实验证实 max_num_seqs 是唯一或主要根因。需复测确认因果，并排除其他潜在因素（如网络抖动、后端存储IO等）。"
+      }
+    },
+    {
+      "seq": 8,
+      "role": "reviewer",
+      "action": "review",
+      "output": {
+        "category": "latency",
+        "conclusion": "并发从4升至32后，P95延迟显著上升（E2E +5.0s, TTFT +2.6s），但吞吐仅微增（+0.2 req/s）。日志显示调度器队列等待请求数为28，结合配置中max_num_seqs=16的限制，表明系统已饱和。额外并发未转化为处理能力，而是导致大量请求在调度器排队，从而引发高延迟。GPU显存峰值无变化，排除OOM风险。根因候选为max_num_seqs配置过低导致的排队瓶颈。",
+        "evidence_ids": [
+          "latency-0:logs",
+          "latency-0:metrics",
+          "latency-0:comparison"
+        ],
+        "recommendations": [
+          "评估并适当调大 max_num_seqs 参数以匹配目标并发量",
+          "监控调度器队列深度与运行中序列数，确认资源利用率",
+          "检查 GPU 计算单元是否成为新的瓶颈（如 SM 利用率）",
+          "考虑实施动态批处理或请求限流策略以平滑负载"
+        ],
+        "verification": [
+          "保持并发为32，将 max_num_seqs 调整为32或更高，复测 P95 延迟与吞吐",
+          "逐步增加并发（4->8->16->24->32），绘制吞吐-延迟曲线以定位饱和拐点",
+          "对比调整前后 scheduler queue waiting requests 指标的变化"
+        ],
+        "uncertainty": "当前证据基于相关性分析，尚未通过控制变量实验证实 max_num_seqs 是唯一或主要根因。需复测确认因果，并排除其他潜在因素（如网络抖动、后端存储IO等）。"
+      }
+    },
+    {
+      "seq": 9,
+      "role": "system",
+      "action": "completed"
+    }
+  ],
+  "tools": [
+    "query_logs",
+    "query_metrics",
+    "compare_runs"
+  ],
+  "usage": [
+    {
+      "prompt_tokens": 159,
+      "completion_tokens": 379,
+      "estimated_cny": 0.0011505,
+      "duration_ms": 5998.208000000886,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1284,
+      "completion_tokens": 45,
+      "estimated_cny": 0.0011487000000000001,
+      "duration_ms": 1907.027499997639,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1383,
+      "completion_tokens": 7,
+      "estimated_cny": 0.0011253,
+      "duration_ms": 1406.7667000017536,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1425,
+      "completion_tokens": 29,
+      "estimated_cny": 0.0012182999999999999,
+      "duration_ms": 2109.550000001036,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1741,
+      "completion_tokens": 12,
+      "estimated_cny": 0.0014252000000000002,
+      "duration_ms": 6594.704600000114,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1788,
+      "completion_tokens": 30,
+      "estimated_cny": 0.0015114,
+      "duration_ms": 1346.9526000008045,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1971,
+      "completion_tokens": 671,
+      "estimated_cny": 0.0033885,
+      "duration_ms": 9281.631599998946,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 2704,
+      "completion_tokens": 394,
+      "estimated_cny": 0.0032270000000000003,
+      "duration_ms": 9132.410700000037,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1294,
+      "completion_tokens": 394,
+      "estimated_cny": 0.002099,
+      "duration_ms": 4914.4670000023325,
+      "attempt": 1
+    }
+  ],
+  "duration_ms": 43558.14190000092
+}

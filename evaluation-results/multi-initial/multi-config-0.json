@@ -1,0 +1,663 @@
+{
+  "status": "completed",
+  "diagnosis": {
+    "category": "config",
+    "conclusion": "请求失败由配置不一致导致。日志显示输入长度 (32768) 超过服务端限制 (max_model_len=2048)。指标对比显示显存峰值无变化，排除 OOM；延迟和吞吐正常，仅成功率下降，证实为校验拒绝而非资源瓶颈。",
+    "evidence_ids": [
+      "config-0:logs",
+      "config-0:metrics",
+      "config-0:comparison"
+    ],
+    "recommendations": [
+      "将服务端 max_model_len 配置更新为 >= 32768 以匹配客户端请求",
+      "评估在 16GB 显存下支持 32k 上下文及当前并发量的可行性，必要时调整 gpu_memory_utilization 或降低并发",
+      "检查网关或客户端配置，确保发送的请求长度与服务端能力对齐"
+    ],
+    "verification": [
+      "修改配置后重启服务，发送长度为 32768 的测试请求，确认返回成功且无错误日志",
+      "监控 GPU 显存使用率，确认新配置下未发生 OOM 或性能显著退化"
+    ],
+    "uncertainty": "需验证在 16GB 显存设备上，将 max_model_len 提升至 32768 后是否会导致 KV Cache 内存不足从而引发新的 OOM 问题，当前证据仅显示旧配置下的显存状态。"
+  },
+  "report": {
+    "case_id": "config-0",
+    "conclusion": "请求失败由配置不一致导致。日志显示输入长度 (32768) 超过服务端限制 (max_model_len=2048)。指标对比显示显存峰值无变化，排除 OOM；延迟和吞吐正常，仅成功率下降，证实为校验拒绝而非资源瓶颈。",
+    "evidence_ids": [
+      "config-0:logs",
+      "config-0:metrics",
+      "config-0:comparison"
+    ],
+    "recommendations": [
+      "将服务端 max_model_len 配置更新为 >= 32768 以匹配客户端请求",
+      "评估在 16GB 显存下支持 32k 上下文及当前并发量的可行性，必要时调整 gpu_memory_utilization 或降低并发",
+      "检查网关或客户端配置，确保发送的请求长度与服务端能力对齐"
+    ],
+    "synthetic": true,
+    "status": "candidate_diagnosis"
+  },
+  "evidence": {
+    "config-0:logs": {
+      "evidence_id": "config-0:logs",
+      "logs": [
+        {
+          "timestamp": "2026-01-01T00:00:01Z",
+          "level": "ERROR",
+          "message": "input length 32768 exceeds max_model_len 2048"
+        }
+      ],
+      "counts": {
+        "ERROR": 1
+      }
+    },
+    "config-0:metrics": {
+      "evidence_id": "config-0:metrics",
+      "synthetic": true,
+      "baseline": {
+        "id": "baseline",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 2048,
+        "concurrency": 4,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 0.4,
+          "e2e_p95_seconds": 2.0,
+          "request_throughput_per_second": 4.0,
+          "success_rate": 1.0,
+          "gpu_memory_peak_mib": 9000.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8
+        }
+      },
+      "current": {
+        "id": "current",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 32768,
+        "concurrency": 4,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 0.4,
+          "e2e_p95_seconds": 2.0,
+          "request_throughput_per_second": 4.0,
+          "success_rate": 0.5,
+          "gpu_memory_peak_mib": 9000.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8,
+          "max_model_len": 2048
+        }
+      }
+    },
+    "config-0:comparison": {
+      "evidence_id": "config-0:comparison",
+      "changed_conditions": {
+        "context_size": {
+          "before": 2048,
+          "after": 32768
+        },
+        "config": {
+          "before": {
+            "max_num_seqs": 16,
+            "gpu_memory_utilization": 0.8
+          },
+          "after": {
+            "max_num_seqs": 16,
+            "gpu_memory_utilization": 0.8,
+            "max_model_len": 2048
+          }
+        }
+      },
+      "deltas": {
+        "ttft_p95_seconds": 0.0,
+        "e2e_p95_seconds": 0.0,
+        "request_throughput_per_second": 0.0,
+        "success_rate": -0.5,
+        "gpu_memory_peak_mib": 0.0
+      },
+      "comparable": true,
+      "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+    }
+  },
+  "events": [
+    {
+      "seq": 1,
+      "role": "system",
+      "action": "running",
+      "mode": "multi"
+    },
+    {
+      "seq": 2,
+      "role": "planner",
+      "action": "plan",
+      "output": "针对 `case_id=config-0`（提高上下文长度后请求失败），制定以下4步排查计划：\n\n1. **获取错误日志与状态码**\n   - **动作**：检索推理服务网关及后端引擎在故障时间段的日志。\n   - **所需证据**：具体的 HTTP 状态码（如 400, 503）、错误消息文本（如 \"context length exceeded\", \"OOM\"）以及对应的 Request ID。\n\n2. **对比配置参数变更**\n   - **动作**：检查当前生效的模型配置文件或环境变量，并与变更前版本进行 Diff。\n   - **所需证据**：`max_context_length`、`batch_size`、`gpu_memory_utilization` 等关键参数的具体数值变化记录。\n\n3. **分析资源监控指标**\n   - **动作**：查看故障发生时刻的 GPU/CPU 内存使用率及显存占用峰值。\n   - **所需证据**：Prometheus/Grafana 中的内存曲线图，确认是否出现显存溢出（OOM）或内存分配失败迹象。\n\n4. **验证最小复现用例**\n   - **动作**：构造不同长度的测试 Prompt，逐步增加 token 数直至触发失败。\n   - **所需证据**：确定实际支持的最大 Token 阈值，并记录该阈值下服务的响应行为（是拒绝请求还是崩溃）。"
+    },
+    {
+      "seq": 3,
+      "role": "system",
+      "action": "mcp_connected",
+      "tools": [
+        "query_logs",
+        "query_metrics",
+        "compare_runs",
+        "replay_case",
+        "search_docs",
+        "generate_report"
+      ]
+    },
+    {
+      "seq": 4,
+      "role": "executor",
+      "action": "tool",
+      "tool": "query_logs",
+      "arguments": {
+        "case_id": "config-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "config-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "input length 32768 exceeds max_model_len 2048"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.6279999985708855,
+      "evidence": {
+        "config-0:logs": {
+          "evidence_id": "config-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "input length 32768 exceeds max_model_len 2048"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "config-0:metrics": {
+          "evidence_id": "config-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 32768,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.5,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8,
+              "max_model_len": 2048
+            }
+          }
+        },
+        "config-0:comparison": {
+          "evidence_id": "config-0:comparison",
+          "changed_conditions": {
+            "context_size": {
+              "before": 2048,
+              "after": 32768
+            },
+            "config": {
+              "before": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8
+              },
+              "after": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8,
+                "max_model_len": 2048
+              }
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.5,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        }
+      }
+    },
+    {
+      "seq": 5,
+      "role": "executor",
+      "action": "tool",
+      "tool": "query_metrics",
+      "arguments": {
+        "case_id": "config-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "config-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 32768,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.5,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8,
+              "max_model_len": 2048
+            }
+          }
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 4.0230999984487426,
+      "evidence": {
+        "config-0:logs": {
+          "evidence_id": "config-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "input length 32768 exceeds max_model_len 2048"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "config-0:metrics": {
+          "evidence_id": "config-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 32768,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.5,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8,
+              "max_model_len": 2048
+            }
+          }
+        },
+        "config-0:comparison": {
+          "evidence_id": "config-0:comparison",
+          "changed_conditions": {
+            "context_size": {
+              "before": 2048,
+              "after": 32768
+            },
+            "config": {
+              "before": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8
+              },
+              "after": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8,
+                "max_model_len": 2048
+              }
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.5,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "role": "executor",
+      "action": "tool",
+      "tool": "compare_runs",
+      "arguments": {
+        "case_id": "config-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "config-0:comparison",
+          "changed_conditions": {
+            "context_size": {
+              "before": 2048,
+              "after": 32768
+            },
+            "config": {
+              "before": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8
+              },
+              "after": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8,
+                "max_model_len": 2048
+              }
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.5,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 2.811500002280809,
+      "evidence": {
+        "config-0:logs": {
+          "evidence_id": "config-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "input length 32768 exceeds max_model_len 2048"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "config-0:metrics": {
+          "evidence_id": "config-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 32768,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.5,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8,
+              "max_model_len": 2048
+            }
+          }
+        },
+        "config-0:comparison": {
+          "evidence_id": "config-0:comparison",
+          "changed_conditions": {
+            "context_size": {
+              "before": 2048,
+              "after": 32768
+            },
+            "config": {
+              "before": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8
+              },
+              "after": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8,
+                "max_model_len": 2048
+              }
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.5,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "role": "executor",
+      "action": "draft",
+      "output": {
+        "category": "config",
+        "conclusion": "请求失败由配置不一致导致。日志明确显示输入长度 (32768) 超过服务端限制 (max_model_len=2048)。指标对比显示显存峰值无变化，排除 OOM；延迟和吞吐正常，仅成功率下降，证实为校验拒绝而非资源瓶颈。",
+        "evidence_ids": [
+          "config-0:logs",
+          "config-0:metrics",
+          "config-0:comparison"
+        ],
+        "recommendations": [
+          "将服务端 max_model_len 配置更新为 >= 32768 以匹配客户端请求",
+          "评估在 16GB 显存下支持 32k 上下文及当前并发量的可行性，必要时调整 gpu_memory_utilization 或降低并发",
+          "检查网关或客户端配置，确保发送的请求长度与服务端能力对齐"
+        ],
+        "verification": [
+          "修改配置后重启服务，发送长度为 32768 的测试请求，确认返回成功且无错误日志",
+          "监控 GPU 显存使用率，确认新配置下未发生 OOM 或性能显著退化"
+        ],
+        "uncertainty": "需验证在 16GB 显存设备上，将 max_model_len 提升至 32768 后是否会导致 KV Cache 内存不足从而引发新的 OOM 问题，当前证据仅显示旧配置下的显存状态。"
+      }
+    },
+    {
+      "seq": 8,
+      "role": "reviewer",
+      "action": "review",
+      "output": {
+        "category": "config",
+        "conclusion": "请求失败由配置不一致导致。日志显示输入长度 (32768) 超过服务端限制 (max_model_len=2048)。指标对比显示显存峰值无变化，排除 OOM；延迟和吞吐正常，仅成功率下降，证实为校验拒绝而非资源瓶颈。",
+        "evidence_ids": [
+          "config-0:logs",
+          "config-0:metrics",
+          "config-0:comparison"
+        ],
+        "recommendations": [
+          "将服务端 max_model_len 配置更新为 >= 32768 以匹配客户端请求",
+          "评估在 16GB 显存下支持 32k 上下文及当前并发量的可行性，必要时调整 gpu_memory_utilization 或降低并发",
+          "检查网关或客户端配置，确保发送的请求长度与服务端能力对齐"
+        ],
+        "verification": [
+          "修改配置后重启服务，发送长度为 32768 的测试请求，确认返回成功且无错误日志",
+          "监控 GPU 显存使用率，确认新配置下未发生 OOM 或性能显著退化"
+        ],
+        "uncertainty": "需验证在 16GB 显存设备上，将 max_model_len 提升至 32768 后是否会导致 KV Cache 内存不足从而引发新的 OOM 问题，当前证据仅显示旧配置下的显存状态。"
+      }
+    },
+    {
+      "seq": 9,
+      "role": "system",
+      "action": "completed"
+    }
+  ],
+  "tools": [
+    "query_logs",
+    "query_metrics",
+    "compare_runs"
+  ],
+  "usage": [
+    {
+      "prompt_tokens": 152,
+      "completion_tokens": 294,
+      "estimated_cny": 0.0009154000000000001,
+      "duration_ms": 6095.434900002147,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1192,
+      "completion_tokens": 45,
+      "estimated_cny": 0.0010751,
+      "duration_ms": 1631.9020999981149,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1301,
+      "completion_tokens": 40,
+      "estimated_cny": 0.0011488,
+      "duration_ms": 1708.5047000000486,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1376,
+      "completion_tokens": 58,
+      "estimated_cny": 0.0012574,
+      "duration_ms": 3061.305100000027,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1905,
+      "completion_tokens": 142,
+      "estimated_cny": 0.0019074,
+      "duration_ms": 3481.6677999988315,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 2175,
+      "completion_tokens": 334,
+      "estimated_cny": 0.0026418,
+      "duration_ms": 5455.390300001454,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1299,
+      "completion_tokens": 333,
+      "estimated_cny": 0.0019383000000000002,
+      "duration_ms": 4336.147800000617,
+      "attempt": 1
+    }
+  ],
+  "duration_ms": 26668.318799998815
+}

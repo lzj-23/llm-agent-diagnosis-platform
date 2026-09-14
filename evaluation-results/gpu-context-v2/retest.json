@@ -1,0 +1,130 @@
+{
+  "experiment": "Context-limit rejection and controlled local retest",
+  "runs": [
+    {
+      "source_sha256": "38f192adb582cc7a4ab38ec498225ac5432a03853a30175992a78fe399832052",
+      "context_tokens": 512,
+      "model": "Qwen3.5-0.8B-Q4_0.gguf",
+      "backend": "llama.cpp, CUDA offload requested, 4 CPU threads",
+      "gpu_observation": "NVIDIA GeForce RTX 3050 Laptop GPU, 681 MiB\n",
+      "server_slots": 1,
+      "output_token_limit": 32,
+      "timestamp": "2026-09-14T14:19:54.889262+00:00",
+      "rows": [
+        {
+          "label": "warmup",
+          "status": 200,
+          "e2e_seconds": 0.23797420000119018
+        },
+        {
+          "label": "serial-0",
+          "status": 200,
+          "e2e_seconds": 0.22816830000010668
+        },
+        {
+          "label": "serial-1",
+          "status": 200,
+          "e2e_seconds": 0.21114260000103968
+        },
+        {
+          "label": "serial-2",
+          "status": 200,
+          "e2e_seconds": 0.21232320000126492
+        },
+        {
+          "label": "concurrent-0",
+          "status": 200,
+          "e2e_seconds": 0.21989860000030603
+        },
+        {
+          "label": "concurrent-2",
+          "status": 200,
+          "e2e_seconds": 0.4257629999992787
+        },
+        {
+          "label": "concurrent-1",
+          "status": 200,
+          "e2e_seconds": 0.6311585000003106
+        },
+        {
+          "label": "oversized-input",
+          "status": 400,
+          "e2e_seconds": 0.006693999999697553
+        }
+      ],
+      "gpu_log_sha256": "d2573607880ab382f6fdf338cde12ca08529063772a531f7c629353ec23c5d63",
+      "gpu_log_evidence": [
+        "offloaded 25/25 layers to GPU",
+        "CUDA0 model buffer size =     0.00 MiB",
+        "offloaded 25/25 layers to GPU",
+        "CUDA0 model buffer size =   526.50 MiB"
+      ]
+    },
+    {
+      "source_sha256": "9cae7f3a45e98fd6cd780b75f79e8d2037ca99f6555e1af5bc5a6ddb216e04c0",
+      "context_tokens": 2048,
+      "model": "Qwen3.5-0.8B-Q4_0.gguf",
+      "backend": "llama.cpp, CUDA offload requested, 4 CPU threads",
+      "gpu_observation": "NVIDIA GeForce RTX 3050 Laptop GPU, 701 MiB\n",
+      "server_slots": 1,
+      "output_token_limit": 32,
+      "timestamp": "2026-09-14T14:20:16.612902+00:00",
+      "rows": [
+        {
+          "label": "warmup",
+          "status": 200,
+          "e2e_seconds": 0.23001289999956498
+        },
+        {
+          "label": "serial-0",
+          "status": 200,
+          "e2e_seconds": 0.2219334000001254
+        },
+        {
+          "label": "serial-1",
+          "status": 200,
+          "e2e_seconds": 0.21487750000233063
+        },
+        {
+          "label": "serial-2",
+          "status": 200,
+          "e2e_seconds": 0.21873210000194376
+        },
+        {
+          "label": "concurrent-0",
+          "status": 200,
+          "e2e_seconds": 0.22867619999669841
+        },
+        {
+          "label": "concurrent-1",
+          "status": 200,
+          "e2e_seconds": 0.43577129999903264
+        },
+        {
+          "label": "concurrent-2",
+          "status": 200,
+          "e2e_seconds": 0.6421916000035708
+        },
+        {
+          "label": "oversized-input",
+          "status": 200,
+          "e2e_seconds": 0.42982409999967786
+        }
+      ],
+      "gpu_log_sha256": "251c42fb20b29f160ea6251373bb433e861303346f24c1919387940e1b7c3a30",
+      "gpu_log_evidence": [
+        "offloaded 25/25 layers to GPU",
+        "CUDA0 model buffer size =     0.00 MiB",
+        "offloaded 25/25 layers to GPU",
+        "CUDA0 model buffer size =   526.50 MiB"
+      ]
+    }
+  ],
+  "verified": "Same oversized input rejected at 512 context, accepted at 2048 context.",
+  "limitations": [
+    "Small llama.cpp 0.8B only; inspect backend and separate GPU evidence; not vLLM/SGLang or production.",
+    "One oversized request per configuration; not a reliability estimate.",
+    "No TTFT, GPU utilization or memory peak measured.",
+    "Latency samples are small, ordered and affected by warmup/cache."
+  ]
+}

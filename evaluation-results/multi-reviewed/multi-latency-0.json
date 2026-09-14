@@ -1,0 +1,869 @@
+{
+  "status": "completed",
+  "diagnosis": {
+    "category": "latency",
+    "conclusion": "并发从4增至32后，P95延迟显著上升（TTFT +2.6s, E2E +5.0s），而吞吐仅微增（+0.2 req/s），表明系统已达到处理能力饱和点。日志显示调度队列等待请求数为28，证实了请求积压。由于显存峰值无变化且成功率保持100%，初步排除OOM风险。根因候选为：1) 调度器并发限制（max_num_seqs=16）低于实际并发（32），导致部分请求必须排队；2) GPU计算资源饱和，单步推理耗时增加，导致整体服务速率无法随并发线性扩展。目前证据倾向于排队导致的延迟，但需区分是配置限制还是硬件算力瓶颈。",
+    "evidence_ids": [
+      "latency-0:metrics",
+      "latency-0:logs",
+      "latency-0:comparison"
+    ],
+    "recommendations": [
+      "监控GPU利用率与SM占用率，确认是否因计算饱和导致处理速度受限",
+      "在显存余量允许的前提下，尝试小幅上调 max_num_seqs（如至24或32），观察吞吐拐点及延迟变化，以验证是否为调度配置瓶颈",
+      "采集 preemption/recompute 计数，排除因KV Cache分配策略导致的非排队型延迟抖动"
+    ],
+    "verification": [
+      "固定其他条件，阶梯式提升并发（8/16/24/32），绘制吞吐-延迟曲线，确定饱和拐点",
+      "对比 max_num_seqs=16 与 max_num_seqs=32 时的 P95 延迟与吞吐差异，验证配置对排队的直接影响",
+      "检查高并发下是否存在 CUDA kernel launch overhead 或通信开销激增，排除非算法层面的性能损耗"
+    ],
+    "uncertainty": "当前数据未包含详细的GPU计算指标（如FLOPS利用率、Kernel执行时间分布），无法确切区分延迟上升是由‘调度队列等待’主导还是由‘单请求计算时间变长’（因批处理变大或资源竞争）主导。此外，未测量具体的批次构成（Batch Size分布），无法判断 max_num_seqs 是否是唯一的限制因素。"
+  },
+  "report": {
+    "case_id": "latency-0",
+    "conclusion": "并发从4增至32后，P95延迟显著上升（TTFT +2.6s, E2E +5.0s），而吞吐仅微增（+0.2 req/s），表明系统已达到处理能力饱和点。日志显示调度队列等待请求数为28，证实了请求积压。由于显存峰值无变化且成功率保持100%，初步排除OOM风险。根因候选为：1) 调度器并发限制（max_num_seqs=16）低于实际并发（32），导致部分请求必须排队；2) GPU计算资源饱和，单步推理耗时增加，导致整体服务速率无法随并发线性扩展。目前证据倾向于排队导致的延迟，但需区分是配置限制还是硬件算力瓶颈。",
+    "evidence_ids": [
+      "latency-0:metrics",
+      "latency-0:logs",
+      "latency-0:comparison"
+    ],
+    "recommendations": [
+      "监控GPU利用率与SM占用率，确认是否因计算饱和导致处理速度受限",
+      "在显存余量允许的前提下，尝试小幅上调 max_num_seqs（如至24或32），观察吞吐拐点及延迟变化，以验证是否为调度配置瓶颈",
+      "采集 preemption/recompute 计数，排除因KV Cache分配策略导致的非排队型延迟抖动"
+    ],
+    "synthetic": true,
+    "status": "candidate_diagnosis"
+  },
+  "evidence": {
+    "latency-0:metrics": {
+      "evidence_id": "latency-0:metrics",
+      "synthetic": true,
+      "baseline": {
+        "id": "baseline",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 2048,
+        "concurrency": 4,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 0.4,
+          "e2e_p95_seconds": 2.0,
+          "request_throughput_per_second": 4.0,
+          "success_rate": 1.0,
+          "gpu_memory_peak_mib": 9000.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8
+        }
+      },
+      "current": {
+        "id": "current",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 2048,
+        "concurrency": 32,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 3.0,
+          "e2e_p95_seconds": 7.0,
+          "request_throughput_per_second": 4.2,
+          "success_rate": 1.0,
+          "gpu_memory_peak_mib": 9000.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8
+        }
+      }
+    },
+    "latency-0:logs": {
+      "evidence_id": "latency-0:logs",
+      "logs": [
+        {
+          "timestamp": "2026-01-01T00:00:01Z",
+          "level": "WARNING",
+          "message": "scheduler queue waiting requests=28"
+        }
+      ],
+      "counts": {
+        "WARNING": 1
+      }
+    },
+    "latency-0:comparison": {
+      "evidence_id": "latency-0:comparison",
+      "changed_conditions": {
+        "concurrency": {
+          "before": 4,
+          "after": 32
+        }
+      },
+      "deltas": {
+        "ttft_p95_seconds": 2.6,
+        "e2e_p95_seconds": 5.0,
+        "request_throughput_per_second": 0.20000000000000018,
+        "success_rate": 0.0,
+        "gpu_memory_peak_mib": 0.0
+      },
+      "comparable": true,
+      "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+    },
+    "doc-latency": {
+      "id": "doc-latency",
+      "title": "延迟与排队排查笔记",
+      "url": "local://runbooks/latency",
+      "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+      "score": 2.0616
+    },
+    "doc-preemption": {
+      "id": "doc-preemption",
+      "title": "vLLM KV cache 与抢占",
+      "url": "https://docs.vllm.ai/en/v0.12.0/configuration/optimization/",
+      "text": "KV cache 不足可导致抢占和重计算。检查 preemption、并发与显存分配。在资源允许时评估 gpu_memory_utilization 或 tensor_parallel_size，也可减少 max_num_seqs 或 max_num_batched_tokens，须实测延迟吞吐权衡。",
+      "score": 1.0887
+    },
+    "doc-memory": {
+      "id": "doc-memory",
+      "title": "显存故障排查笔记",
+      "url": "local://runbooks/memory",
+      "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+      "score": 0.6222
+    }
+  },
+  "events": [
+    {
+      "seq": 1,
+      "role": "system",
+      "action": "running",
+      "mode": "multi"
+    },
+    {
+      "seq": 2,
+      "role": "planner",
+      "action": "plan",
+      "output": {
+        "steps": [
+          {
+            "tool": "query_metrics",
+            "purpose": "获取并发升高前后的 P95 延迟、QPS、队列长度及资源利用率指标，确认排队与吞吐变化趋势"
+          },
+          {
+            "tool": "query_logs",
+            "purpose": "检索高并发时段的推理服务日志，查找请求排队、超时或资源瓶颈相关记录"
+          },
+          {
+            "tool": "compare_runs",
+            "purpose": "对比正常负载与高并发负载下的运行数据，定位延迟上升的具体阶段和关联因素"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "role": "system",
+      "action": "mcp_connected",
+      "tools": [
+        "query_logs",
+        "query_metrics",
+        "compare_runs",
+        "replay_case",
+        "search_docs",
+        "generate_report"
+      ]
+    },
+    {
+      "seq": 4,
+      "role": "executor",
+      "action": "tool",
+      "tool": "query_metrics",
+      "arguments": {
+        "case_id": "latency-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "latency-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 32,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 3.0,
+              "e2e_p95_seconds": 7.0,
+              "request_throughput_per_second": 4.2,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.505199998471653,
+      "evidence": {
+        "latency-0:metrics": {
+          "evidence_id": "latency-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 32,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 3.0,
+              "e2e_p95_seconds": 7.0,
+              "request_throughput_per_second": 4.2,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "latency-0:logs": {
+          "evidence_id": "latency-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "WARNING",
+              "message": "scheduler queue waiting requests=28"
+            }
+          ],
+          "counts": {
+            "WARNING": 1
+          }
+        },
+        "latency-0:comparison": {
+          "evidence_id": "latency-0:comparison",
+          "changed_conditions": {
+            "concurrency": {
+              "before": 4,
+              "after": 32
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 2.6,
+            "e2e_p95_seconds": 5.0,
+            "request_throughput_per_second": 0.20000000000000018,
+            "success_rate": 0.0,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "doc-latency": {
+          "id": "doc-latency",
+          "title": "延迟与排队排查笔记",
+          "url": "local://runbooks/latency",
+          "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+          "score": 2.0616
+        },
+        "doc-preemption": {
+          "id": "doc-preemption",
+          "title": "vLLM KV cache 与抢占",
+          "url": "https://docs.vllm.ai/en/v0.12.0/configuration/optimization/",
+          "text": "KV cache 不足可导致抢占和重计算。检查 preemption、并发与显存分配。在资源允许时评估 gpu_memory_utilization 或 tensor_parallel_size，也可减少 max_num_seqs 或 max_num_batched_tokens，须实测延迟吞吐权衡。",
+          "score": 1.0887
+        },
+        "doc-memory": {
+          "id": "doc-memory",
+          "title": "显存故障排查笔记",
+          "url": "local://runbooks/memory",
+          "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+          "score": 0.6222
+        }
+      }
+    },
+    {
+      "seq": 5,
+      "role": "executor",
+      "action": "tool",
+      "tool": "query_logs",
+      "arguments": {
+        "case_id": "latency-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "latency-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "WARNING",
+              "message": "scheduler queue waiting requests=28"
+            }
+          ],
+          "counts": {
+            "WARNING": 1
+          }
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.8650999995297752,
+      "evidence": {
+        "latency-0:metrics": {
+          "evidence_id": "latency-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 32,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 3.0,
+              "e2e_p95_seconds": 7.0,
+              "request_throughput_per_second": 4.2,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "latency-0:logs": {
+          "evidence_id": "latency-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "WARNING",
+              "message": "scheduler queue waiting requests=28"
+            }
+          ],
+          "counts": {
+            "WARNING": 1
+          }
+        },
+        "latency-0:comparison": {
+          "evidence_id": "latency-0:comparison",
+          "changed_conditions": {
+            "concurrency": {
+              "before": 4,
+              "after": 32
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 2.6,
+            "e2e_p95_seconds": 5.0,
+            "request_throughput_per_second": 0.20000000000000018,
+            "success_rate": 0.0,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "doc-latency": {
+          "id": "doc-latency",
+          "title": "延迟与排队排查笔记",
+          "url": "local://runbooks/latency",
+          "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+          "score": 2.0616
+        },
+        "doc-preemption": {
+          "id": "doc-preemption",
+          "title": "vLLM KV cache 与抢占",
+          "url": "https://docs.vllm.ai/en/v0.12.0/configuration/optimization/",
+          "text": "KV cache 不足可导致抢占和重计算。检查 preemption、并发与显存分配。在资源允许时评估 gpu_memory_utilization 或 tensor_parallel_size，也可减少 max_num_seqs 或 max_num_batched_tokens，须实测延迟吞吐权衡。",
+          "score": 1.0887
+        },
+        "doc-memory": {
+          "id": "doc-memory",
+          "title": "显存故障排查笔记",
+          "url": "local://runbooks/memory",
+          "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+          "score": 0.6222
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "role": "executor",
+      "action": "tool",
+      "tool": "compare_runs",
+      "arguments": {
+        "case_id": "latency-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "latency-0:comparison",
+          "changed_conditions": {
+            "concurrency": {
+              "before": 4,
+              "after": 32
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 2.6,
+            "e2e_p95_seconds": 5.0,
+            "request_throughput_per_second": 0.20000000000000018,
+            "success_rate": 0.0,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.455100002611289,
+      "evidence": {
+        "latency-0:metrics": {
+          "evidence_id": "latency-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 32,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 3.0,
+              "e2e_p95_seconds": 7.0,
+              "request_throughput_per_second": 4.2,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "latency-0:logs": {
+          "evidence_id": "latency-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "WARNING",
+              "message": "scheduler queue waiting requests=28"
+            }
+          ],
+          "counts": {
+            "WARNING": 1
+          }
+        },
+        "latency-0:comparison": {
+          "evidence_id": "latency-0:comparison",
+          "changed_conditions": {
+            "concurrency": {
+              "before": 4,
+              "after": 32
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 2.6,
+            "e2e_p95_seconds": 5.0,
+            "request_throughput_per_second": 0.20000000000000018,
+            "success_rate": 0.0,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "doc-latency": {
+          "id": "doc-latency",
+          "title": "延迟与排队排查笔记",
+          "url": "local://runbooks/latency",
+          "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+          "score": 2.0616
+        },
+        "doc-preemption": {
+          "id": "doc-preemption",
+          "title": "vLLM KV cache 与抢占",
+          "url": "https://docs.vllm.ai/en/v0.12.0/configuration/optimization/",
+          "text": "KV cache 不足可导致抢占和重计算。检查 preemption、并发与显存分配。在资源允许时评估 gpu_memory_utilization 或 tensor_parallel_size，也可减少 max_num_seqs 或 max_num_batched_tokens，须实测延迟吞吐权衡。",
+          "score": 1.0887
+        },
+        "doc-memory": {
+          "id": "doc-memory",
+          "title": "显存故障排查笔记",
+          "url": "local://runbooks/memory",
+          "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+          "score": 0.6222
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "role": "executor",
+      "action": "tool",
+      "tool": "search_docs",
+      "arguments": {
+        "query": "并发升高 P95 延迟上升 排队 max_num_seqs 吞吐饱和 推理服务",
+        "top_k": 3
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "query": "并发升高 P95 延迟上升 排队 max_num_seqs 吞吐饱和 推理服务",
+          "rewritten_query": "并发升高 P95 延迟上升 排队 max_num_seqs 吞吐饱和 推理服务",
+          "backend": "lexical_baseline",
+          "hits": [
+            {
+              "id": "doc-latency",
+              "title": "延迟与排队排查笔记",
+              "url": "local://runbooks/latency",
+              "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+              "score": 2.0616
+            },
+            {
+              "id": "doc-preemption",
+              "title": "vLLM KV cache 与抢占",
+              "url": "https://docs.vllm.ai/en/v0.12.0/configuration/optimization/",
+              "text": "KV cache 不足可导致抢占和重计算。检查 preemption、并发与显存分配。在资源允许时评估 gpu_memory_utilization 或 tensor_parallel_size，也可减少 max_num_seqs 或 max_num_batched_tokens，须实测延迟吞吐权衡。",
+              "score": 1.0887
+            },
+            {
+              "id": "doc-memory",
+              "title": "显存故障排查笔记",
+              "url": "local://runbooks/memory",
+              "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+              "score": 0.6222
+            }
+          ],
+          "empty": false
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 4.11789999998291,
+      "evidence": {
+        "latency-0:metrics": {
+          "evidence_id": "latency-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 32,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 3.0,
+              "e2e_p95_seconds": 7.0,
+              "request_throughput_per_second": 4.2,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "latency-0:logs": {
+          "evidence_id": "latency-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "WARNING",
+              "message": "scheduler queue waiting requests=28"
+            }
+          ],
+          "counts": {
+            "WARNING": 1
+          }
+        },
+        "latency-0:comparison": {
+          "evidence_id": "latency-0:comparison",
+          "changed_conditions": {
+            "concurrency": {
+              "before": 4,
+              "after": 32
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 2.6,
+            "e2e_p95_seconds": 5.0,
+            "request_throughput_per_second": 0.20000000000000018,
+            "success_rate": 0.0,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "doc-latency": {
+          "id": "doc-latency",
+          "title": "延迟与排队排查笔记",
+          "url": "local://runbooks/latency",
+          "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+          "score": 2.0616
+        },
+        "doc-preemption": {
+          "id": "doc-preemption",
+          "title": "vLLM KV cache 与抢占",
+          "url": "https://docs.vllm.ai/en/v0.12.0/configuration/optimization/",
+          "text": "KV cache 不足可导致抢占和重计算。检查 preemption、并发与显存分配。在资源允许时评估 gpu_memory_utilization 或 tensor_parallel_size，也可减少 max_num_seqs 或 max_num_batched_tokens，须实测延迟吞吐权衡。",
+          "score": 1.0887
+        },
+        "doc-memory": {
+          "id": "doc-memory",
+          "title": "显存故障排查笔记",
+          "url": "local://runbooks/memory",
+          "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+          "score": 0.6222
+        }
+      }
+    },
+    {
+      "seq": 8,
+      "role": "executor",
+      "action": "draft",
+      "output": {
+        "category": "latency",
+        "conclusion": "并发从4升至32后，P95延迟显著上升（TTFT +2.6s, E2E +5.0s），但吞吐仅微增（+0.2 req/s）且显存峰值无变化。日志显示调度队列等待请求数为28，与超出当前有效处理能力的请求量吻合。证据指向请求在调度层排队导致延迟增加，而非资源耗尽或计算瓶颈。根因候选为调度容量限制（如max_num_seqs配置与实际并发不匹配）。",
+        "evidence_ids": [
+          "latency-0:metrics",
+          "latency-0:logs",
+          "latency-0:comparison"
+        ],
+        "recommendations": [
+          "检查并调整 max_num_seqs 配置，确保其能支撑目标并发下的有效批处理大小",
+          "监控调度器队列长度指标，确认高并发下是否存在持续积压",
+          "评估 KV cache 分配策略，排除因内存碎片或预留不足导致的隐性调度阻塞"
+        ],
+        "verification": [
+          "固定其他条件，阶梯式提升并发（8/16/24/32），观察吞吐拐点与队列长度关系",
+          "尝试上调 max_num_seqs 后复测，验证 P95 延迟是否回落及吞吐是否提升",
+          "采集 preemption/recompute 计数，确认是否存在因资源竞争导致的非排队延迟"
+        ],
+        "uncertainty": "当前证据未包含详细的调度器内部状态（如具体批次构成、抢占次数），无法完全排除 KV cache 压力导致的隐性调度效率下降；需通过控制变量复测确认因果。"
+      }
+    },
+    {
+      "seq": 9,
+      "role": "reviewer",
+      "action": "review",
+      "issues": [
+        "草稿结论中‘根因候选为调度容量限制（如max_num_seqs配置与实际并发不匹配）’表述过于确定。虽然日志显示队列等待28，且 max_num_seqs=16 < 并发32，但这仅表明存在排队现象，不能直接断定 max_num_seqs 是唯一或主要瓶颈，也可能是 GPU 计算饱和导致处理速度跟不上入队速度。需改为假设并强调验证步骤。",
+        "草稿建议‘检查并调整 max_num_seqs...确保其能支撑目标并发下的有效批处理大小’隐含了调大该参数即可解决问题的因果推断。实际上，若显存或算力受限，盲目调大 max_num_seqs 可能导致 OOM 或更严重的抢占/重计算，反而恶化延迟。应修改为‘评估在资源允许范围内适当增加 max_num_seqs 对吞吐和延迟的影响’。",
+        "证据分析中未充分讨论‘吞吐微增’的含义。从4到32并发，吞吐仅从4.0升至4.2 req/s，说明系统已处于饱和状态（Saturation）。此时延迟上升是排队论的必然结果，而非单纯的配置错误。草稿虽提到排队，但未明确指出这是系统达到处理能力上限的表现。",
+        "不确定性部分提及‘无法完全排除 KV cache 压力’，但证据中显存峰值无变化（9000 MiB），且成功率为1.0，暂无直接证据支持 KV cache 不足导致的隐性阻塞。虽然保留此假设合理，但应更明确地指出当前证据不支持 OOM 或严重内存碎片化，重点应放在计算/调度饱和上。"
+      ],
+      "output": {
+        "category": "latency",
+        "conclusion": "并发从4增至32后，P95延迟显著上升（TTFT +2.6s, E2E +5.0s），而吞吐仅微增（+0.2 req/s），表明系统已达到处理能力饱和点。日志显示调度队列等待请求数为28，证实了请求积压。由于显存峰值无变化且成功率保持100%，初步排除OOM风险。根因候选为：1) 调度器并发限制（max_num_seqs=16）低于实际并发（32），导致部分请求必须排队；2) GPU计算资源饱和，单步推理耗时增加，导致整体服务速率无法随并发线性扩展。目前证据倾向于排队导致的延迟，但需区分是配置限制还是硬件算力瓶颈。",
+        "evidence_ids": [
+          "latency-0:metrics",
+          "latency-0:logs",
+          "latency-0:comparison"
+        ],
+        "recommendations": [
+          "监控GPU利用率与SM占用率，确认是否因计算饱和导致处理速度受限",
+          "在显存余量允许的前提下，尝试小幅上调 max_num_seqs（如至24或32），观察吞吐拐点及延迟变化，以验证是否为调度配置瓶颈",
+          "采集 preemption/recompute 计数，排除因KV Cache分配策略导致的非排队型延迟抖动"
+        ],
+        "verification": [
+          "固定其他条件，阶梯式提升并发（8/16/24/32），绘制吞吐-延迟曲线，确定饱和拐点",
+          "对比 max_num_seqs=16 与 max_num_seqs=32 时的 P95 延迟与吞吐差异，验证配置对排队的直接影响",
+          "检查高并发下是否存在 CUDA kernel launch overhead 或通信开销激增，排除非算法层面的性能损耗"
+        ],
+        "uncertainty": "当前数据未包含详细的GPU计算指标（如FLOPS利用率、Kernel执行时间分布），无法确切区分延迟上升是由‘调度队列等待’主导还是由‘单请求计算时间变长’（因批处理变大或资源竞争）主导。此外，未测量具体的批次构成（Batch Size分布），无法判断 max_num_seqs 是否是唯一的限制因素。"
+      }
+    },
+    {
+      "seq": 10,
+      "role": "system",
+      "action": "completed"
+    }
+  ],
+  "tools": [
+    "query_metrics",
+    "query_logs",
+    "compare_runs",
+    "search_docs"
+  ],
+  "usage": [
+    {
+      "prompt_tokens": 330,
+      "completion_tokens": 142,
+      "estimated_cny": 0.0006474000000000001,
+      "duration_ms": 3466.6690999983985,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 997,
+      "completion_tokens": 29,
+      "estimated_cny": 0.0008759000000000001,
+      "duration_ms": 1547.4868999990576,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1275,
+      "completion_tokens": 16,
+      "estimated_cny": 0.0010632,
+      "duration_ms": 1359.1459999988729,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1326,
+      "completion_tokens": 29,
+      "estimated_cny": 0.0011390999999999999,
+      "duration_ms": 1548.0516999996325,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1447,
+      "completion_tokens": 30,
+      "estimated_cny": 0.0012386,
+      "duration_ms": 1625.433900000644,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1630,
+      "completion_tokens": 54,
+      "estimated_cny": 0.0014498,
+      "duration_ms": 1656.9643999973778,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 2044,
+      "completion_tokens": 425,
+      "estimated_cny": 0.0027827,
+      "duration_ms": 9395.985200000723,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 2842,
+      "completion_tokens": 378,
+      "estimated_cny": 0.0032941999999999997,
+      "duration_ms": 6568.854100001772,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1705,
+      "completion_tokens": 865,
+      "estimated_cny": 0.0036995,
+      "duration_ms": 19270.36869999938,
+      "attempt": 1
+    }
+  ],
+  "duration_ms": 47290.78259999733
+}

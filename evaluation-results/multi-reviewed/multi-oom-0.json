@@ -1,0 +1,592 @@
+{
+  "status": "completed",
+  "diagnosis": {
+    "category": "oom",
+    "conclusion": "日志确认发生 CUDA out of memory 错误。指标对比显示，在模型、设备及静态配置（max_num_seqs=16, gpu_memory_utilization=0.8）保持一致的情况下，GPU 显存峰值从基线的 9000 MiB 激增至 15800 MiB（增加 6800 MiB），逼近 16GB 设备物理上限，导致成功率下降至 0.65。由于缺乏运行时内存分配详情及时间序列趋势，无法确定是瞬时大请求、内存泄漏还是底层库行为变更所致，目前仅能确认为显存占用异常升高引发的资源耗尽。",
+    "evidence_ids": [
+      "oom-0:logs",
+      "oom-0:metrics",
+      "oom-0:comparison"
+    ],
+    "recommendations": [
+      "采集服务运行期间的显存时间序列数据，观察是否存在随时间累积的阶梯式增长以排查内存泄漏。",
+      "使用 profiler 或 nvidia-smi dmon 捕获 OOM 发生时刻的具体算子或模块显存占用，定位异常来源。",
+      "检查推理引擎、PyTorch 或 CUDA Driver 的版本是否发生变更，评估新版本的显存管理策略影响。",
+      "尝试临时降低 max_num_seqs 或限制单请求最大 token 数，进行控制变量复测以验证是否为特定负载组合触发的边界溢出。"
+    ],
+    "verification": [
+      "回滚至基线软件栈版本，在相同负载下监控显存峰值是否恢复至 9000 MiB 左右。",
+      "执行压力测试，逐步增加并发或序列长度，绘制显存占用曲线，确定新的 OOM 触发阈值是否与理论计算相符。",
+      "重启服务并持续监控，若显存随请求处理次数线性增长则证实存在泄漏。"
+    ],
+    "uncertainty": "当前证据未包含详细的显存分配堆栈、时间序列数据或软件版本变更记录；无法区分是瞬时大请求导致的峰值、长期泄漏导致的累积溢出，还是底层驱动/库版本差异引入的非预期资源占用；亦未排除硬件故障或后台进程干扰的可能性。"
+  },
+  "report": {
+    "case_id": "oom-0",
+    "conclusion": "日志确认发生 CUDA out of memory 错误。指标对比显示，在模型、设备及静态配置（max_num_seqs=16, gpu_memory_utilization=0.8）保持一致的情况下，GPU 显存峰值从基线的 9000 MiB 激增至 15800 MiB（增加 6800 MiB），逼近 16GB 设备物理上限，导致成功率下降至 0.65。由于缺乏运行时内存分配详情及时间序列趋势，无法确定是瞬时大请求、内存泄漏还是底层库行为变更所致，目前仅能确认为显存占用异常升高引发的资源耗尽。",
+    "evidence_ids": [
+      "oom-0:logs",
+      "oom-0:metrics",
+      "oom-0:comparison"
+    ],
+    "recommendations": [
+      "采集服务运行期间的显存时间序列数据，观察是否存在随时间累积的阶梯式增长以排查内存泄漏。",
+      "使用 profiler 或 nvidia-smi dmon 捕获 OOM 发生时刻的具体算子或模块显存占用，定位异常来源。",
+      "检查推理引擎、PyTorch 或 CUDA Driver 的版本是否发生变更，评估新版本的显存管理策略影响。",
+      "尝试临时降低 max_num_seqs 或限制单请求最大 token 数，进行控制变量复测以验证是否为特定负载组合触发的边界溢出。"
+    ],
+    "synthetic": true,
+    "status": "candidate_diagnosis"
+  },
+  "evidence": {
+    "oom-0:logs": {
+      "evidence_id": "oom-0:logs",
+      "logs": [
+        {
+          "timestamp": "2026-01-01T00:00:01Z",
+          "level": "ERROR",
+          "message": "CUDA out of memory: allocation failed"
+        }
+      ],
+      "counts": {
+        "ERROR": 1
+      }
+    },
+    "oom-0:metrics": {
+      "evidence_id": "oom-0:metrics",
+      "synthetic": true,
+      "baseline": {
+        "id": "baseline",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 2048,
+        "concurrency": 4,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 0.4,
+          "e2e_p95_seconds": 2.0,
+          "request_throughput_per_second": 4.0,
+          "success_rate": 1.0,
+          "gpu_memory_peak_mib": 9000.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8
+        }
+      },
+      "current": {
+        "id": "current",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 2048,
+        "concurrency": 4,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 0.4,
+          "e2e_p95_seconds": 2.0,
+          "request_throughput_per_second": 4.0,
+          "success_rate": 0.65,
+          "gpu_memory_peak_mib": 15800.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8
+        }
+      }
+    },
+    "oom-0:comparison": {
+      "evidence_id": "oom-0:comparison",
+      "changed_conditions": {},
+      "deltas": {
+        "ttft_p95_seconds": 0.0,
+        "e2e_p95_seconds": 0.0,
+        "request_throughput_per_second": 0.0,
+        "success_rate": -0.35,
+        "gpu_memory_peak_mib": 6800.0
+      },
+      "comparable": true,
+      "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+    }
+  },
+  "events": [
+    {
+      "seq": 1,
+      "role": "system",
+      "action": "running",
+      "mode": "multi"
+    },
+    {
+      "seq": 2,
+      "role": "planner",
+      "action": "plan",
+      "output": {
+        "steps": [
+          {
+            "tool": "query_logs",
+            "purpose": "检索包含 'CUDA out of memory'、'OOM' 或显存分配失败关键字的服务日志，定位报错时间点及上下文堆栈。"
+          },
+          {
+            "tool": "query_metrics",
+            "purpose": "查询 GPU 显存使用率（GPU Memory Usage）和请求队列长度指标，确认 OOM 发生前的显存增长趋势及负载情况。"
+          },
+          {
+            "tool": "compare_runs",
+            "purpose": "对比正常服务运行与故障期间的关键配置参数（如 batch size、max tokens）及资源占用差异，识别导致显存溢出的具体变更或异常负载。"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "role": "system",
+      "action": "mcp_connected",
+      "tools": [
+        "query_logs",
+        "query_metrics",
+        "compare_runs",
+        "replay_case",
+        "search_docs",
+        "generate_report"
+      ]
+    },
+    {
+      "seq": 4,
+      "role": "executor",
+      "action": "tool",
+      "tool": "query_logs",
+      "arguments": {
+        "case_id": "oom-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "oom-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "CUDA out of memory: allocation failed"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.547600001184037,
+      "evidence": {
+        "oom-0:logs": {
+          "evidence_id": "oom-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "CUDA out of memory: allocation failed"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "oom-0:metrics": {
+          "evidence_id": "oom-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.65,
+              "gpu_memory_peak_mib": 15800.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "oom-0:comparison": {
+          "evidence_id": "oom-0:comparison",
+          "changed_conditions": {},
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.35,
+            "gpu_memory_peak_mib": 6800.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        }
+      }
+    },
+    {
+      "seq": 5,
+      "role": "executor",
+      "action": "tool",
+      "tool": "query_metrics",
+      "arguments": {
+        "case_id": "oom-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "oom-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.65,
+              "gpu_memory_peak_mib": 15800.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 2.694599999813363,
+      "evidence": {
+        "oom-0:logs": {
+          "evidence_id": "oom-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "CUDA out of memory: allocation failed"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "oom-0:metrics": {
+          "evidence_id": "oom-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.65,
+              "gpu_memory_peak_mib": 15800.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "oom-0:comparison": {
+          "evidence_id": "oom-0:comparison",
+          "changed_conditions": {},
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.35,
+            "gpu_memory_peak_mib": 6800.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "role": "executor",
+      "action": "tool",
+      "tool": "compare_runs",
+      "arguments": {
+        "case_id": "oom-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "oom-0:comparison",
+          "changed_conditions": {},
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.35,
+            "gpu_memory_peak_mib": 6800.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 2.3828999983379617,
+      "evidence": {
+        "oom-0:logs": {
+          "evidence_id": "oom-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "CUDA out of memory: allocation failed"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "oom-0:metrics": {
+          "evidence_id": "oom-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.65,
+              "gpu_memory_peak_mib": 15800.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "oom-0:comparison": {
+          "evidence_id": "oom-0:comparison",
+          "changed_conditions": {},
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.35,
+            "gpu_memory_peak_mib": 6800.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "role": "executor",
+      "action": "draft",
+      "output": {
+        "category": "oom",
+        "conclusion": "日志确认发生 CUDA out of memory 错误。指标对比显示，在模型、设备、并发数及配置参数（max_num_seqs, gpu_memory_utilization）均保持一致的情况下，GPU 显存峰值从基线的 9000 MiB 激增至 15800 MiB（增加 6800 MiB），导致成功率下降至 0.65。由于配置无变化且负载参数相同，显存异常增长可能源于内存泄漏、碎片化或底层驱动/库版本差异导致的非预期资源占用。",
+        "evidence_ids": [
+          "oom-0:logs",
+          "oom-0:metrics",
+          "oom-0:comparison"
+        ],
+        "recommendations": [
+          "检查服务运行期间是否存在内存泄漏迹象，监控显存随时间的累积趋势而非仅看峰值。",
+          "排查推理引擎或依赖库（如 PyTorch/CUDA Driver）的版本变更，确认是否引入新的显存分配行为。",
+          "尝试降低 max_num_seqs 或调整 batch size 进行控制变量复测，以验证是否为特定序列长度组合触发的边界溢出。",
+          "启用显存详细分析工具（如 nvidia-smi dmon 或 profiler）定位具体占用显存的算子或缓存模块。"
+        ],
+        "verification": [
+          "在相同配置下重启服务并持续监控显存曲线，确认是否出现阶梯式上升（泄漏特征）。",
+          "回滚至基线版本的软件栈，观察显存峰值是否恢复至 9000 MiB 左右。",
+          "执行压力测试，逐步增加并发或序列长度，确定新的 OOM 触发阈值是否与理论计算相符。"
+        ],
+        "uncertainty": "当前证据未包含详细的显存分配堆栈或时间序列数据，无法区分是瞬时大请求导致的峰值还是长期泄漏导致的累积溢出；亦未排除硬件故障或后台进程干扰的可能性。"
+      }
+    },
+    {
+      "seq": 8,
+      "role": "reviewer",
+      "action": "review",
+      "issues": [
+        "结论中声称'配置无变化且负载参数相同'，但证据仅显示静态配置项一致，未提供运行时实际序列长度分布或内存分配堆栈，无法排除因请求内容差异导致的显存波动。",
+        "将显存激增归因为'内存泄漏、碎片化或驱动版本差异'属于猜测，缺乏时间序列数据支持（如阶梯式上升）或版本变更记录，应降级为假设。",
+        "建议中提及'降低 max_num_seqs'作为验证手段合理，但结论部分隐含了当前配置足以导致OOM的确定性判断，需强调这是待验证的边界条件而非已证实根因。",
+        "未明确指出15800 MiB接近16GB设备物理上限，高利用率下微小波动即可触发OOM，这一背景信息对理解'为何基线9000正常而当前15800失败'至关重要，应在结论中补充。"
+      ],
+      "output": {
+        "category": "oom",
+        "conclusion": "日志确认发生 CUDA out of memory 错误。指标对比显示，在模型、设备及静态配置（max_num_seqs=16, gpu_memory_utilization=0.8）保持一致的情况下，GPU 显存峰值从基线的 9000 MiB 激增至 15800 MiB（增加 6800 MiB），逼近 16GB 设备物理上限，导致成功率下降至 0.65。由于缺乏运行时内存分配详情及时间序列趋势，无法确定是瞬时大请求、内存泄漏还是底层库行为变更所致，目前仅能确认为显存占用异常升高引发的资源耗尽。",
+        "evidence_ids": [
+          "oom-0:logs",
+          "oom-0:metrics",
+          "oom-0:comparison"
+        ],
+        "recommendations": [
+          "采集服务运行期间的显存时间序列数据，观察是否存在随时间累积的阶梯式增长以排查内存泄漏。",
+          "使用 profiler 或 nvidia-smi dmon 捕获 OOM 发生时刻的具体算子或模块显存占用，定位异常来源。",
+          "检查推理引擎、PyTorch 或 CUDA Driver 的版本是否发生变更，评估新版本的显存管理策略影响。",
+          "尝试临时降低 max_num_seqs 或限制单请求最大 token 数，进行控制变量复测以验证是否为特定负载组合触发的边界溢出。"
+        ],
+        "verification": [
+          "回滚至基线软件栈版本，在相同负载下监控显存峰值是否恢复至 9000 MiB 左右。",
+          "执行压力测试，逐步增加并发或序列长度，绘制显存占用曲线，确定新的 OOM 触发阈值是否与理论计算相符。",
+          "重启服务并持续监控，若显存随请求处理次数线性增长则证实存在泄漏。"
+        ],
+        "uncertainty": "当前证据未包含详细的显存分配堆栈、时间序列数据或软件版本变更记录；无法区分是瞬时大请求导致的峰值、长期泄漏导致的累积溢出，还是底层驱动/库版本差异引入的非预期资源占用；亦未排除硬件故障或后台进程干扰的可能性。"
+      }
+    },
+    {
+      "seq": 9,
+      "role": "system",
+      "action": "completed"
+    }
+  ],
+  "tools": [
+    "query_logs",
+    "query_metrics",
+    "compare_runs"
+  ],
+  "usage": [
+    {
+      "prompt_tokens": 328,
+      "completion_tokens": 175,
+      "estimated_cny": 0.0007349000000000001,
+      "duration_ms": 4261.959200001002,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1028,
+      "completion_tokens": 87,
+      "estimated_cny": 0.0010573000000000002,
+      "duration_ms": 1972.8071999998065,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1500,
+      "completion_tokens": 82,
+      "estimated_cny": 0.0014214000000000002,
+      "duration_ms": 2785.151100000803,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1611,
+      "completion_tokens": 439,
+      "estimated_cny": 0.0024741000000000003,
+      "duration_ms": 8993.149800000538,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1429,
+      "completion_tokens": 716,
+      "estimated_cny": 0.0030764,
+      "duration_ms": 11675.622800001292,
+      "attempt": 1
+    }
+  ],
+  "duration_ms": 30543.698699999368
+}

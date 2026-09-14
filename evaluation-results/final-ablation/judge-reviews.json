@@ -1,0 +1,749 @@
+[
+  {
+    "file": "multi-config-0.json",
+    "valid": true,
+    "judgment": {
+      "claims": [
+        {
+          "quote": "请求失败的高置信度根因为推理服务配置中的 max_model_len (2048) 小于实际输入上下文长度 (32768)",
+          "verdict": "supported",
+          "reason": "日志证据明确显示 'input length 32768 exceeds max_model_len 2048'，且对比数据显示 context_size 变化导致成功率下降，支持该结论。"
+        },
+        {
+          "quote": "日志明确报错 'input length 32768 exceeds max_model_len 2048'",
+          "verdict": "supported",
+          "reason": "直接引用自 evidence_id: config-0:logs 中的 ERROR 级别日志消息。"
+        },
+        {
+          "quote": "因请求被前置拦截，显存、延迟等指标无变化",
+          "verdict": "supported",
+          "reason": "config-0:comparison 的 deltas 显示 ttft_p95_seconds, e2e_p95_seconds, gpu_memory_peak_mib 均为 0.0，符合请求在计算前被拒绝的特征。"
+        },
+        {
+          "quote": "这符合配置限制导致的快速失败特征，而非性能瓶颈或运行时 OOM",
+          "verdict": "supported",
+          "reason": "基于上述指标无变化（特别是显存峰值未增加）和明确的配置超限错误日志，排除了资源耗尽型故障。"
+        },
+        {
+          "quote": "需注意，当前数据无法反映修复配置后的真实资源消耗",
+          "verdict": "supported",
+          "reason": "replay_case 工具返回 note: \"没有启动推理服务，也没有生成新的硬件测量数据\"，且 metrics 为 synthetic，证实缺乏修复后的实测数据。"
+        }
+      ],
+      "tool_selection": "appropriate",
+      "parameter_semantics": "correct",
+      "citation_support": "supported"
+    },
+    "usage": [
+      {
+        "prompt_tokens": 1829,
+        "completion_tokens": 441,
+        "estimated_cny": 0.0026539000000000003,
+        "duration_ms": 7420.475499999156,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "{\n \"claims\": [\n  {\n   \"quote\": \"请求失败的高置信度根因为推理服务配置中的 max_model_len (2048) 小于实际输入上下文长度 (32768)\",\n   \"verdict\": \"supported\",\n   \"reason\": \"日志证据明确显示 'input length 32768 exceeds max_model_len 2048'，且对比数据显示 context_size 变化导致成功率下降，支持该结论。\"\n  },\n  {\n   \"quote\": \"日志明确报错 'input length 32768 exceeds max_model_len 2048'\",\n   \"verdict\": \"supported\",\n   \"reason\": \"直接引用自 evidence_id: config-0:logs 中的 ERROR 级别日志消息。\"\n  },\n  {\n   \"quote\": \"因请求被前置拦截，显存、延迟等指标无变化\",\n   \"verdict\": \"supported\",\n   \"reason\": \"config-0:comparison 的 deltas 显示 ttft_p95_seconds, e2e_p95_seconds, gpu_memory_peak_mib 均为 0.0，符合请求在计算前被拒绝的特征。\"\n  },\n  {\n   \"quote\": \"这符合配置限制导致的快速失败特征，而非性能瓶颈或运行时 OOM\",\n   \"verdict\": \"supported\",\n   \"reason\": \"基于上述指标无变化（特别是显存峰值未增加）和明确的配置超限错误日志，排除了资源耗尽型故障。\"\n  },\n  {\n   \"quote\": \"需注意，当前数据无法反映修复配置后的真实资源消耗\",\n   \"verdict\": \"supported\",\n   \"reason\": \"replay_case 工具返回 note: \\\"没有启动推理服务，也没有生成新的硬件测量数据\\\"，且 metrics 为 synthetic，证实缺乏修复后的实测数据。\"\n  }\n ],\n \"tool_selection\": \"appropriate\",\n \"parameter_semantics\": \"correct\",\n \"citation_support\": \"supported\"\n}"
+    }
+  },
+  {
+    "file": "multi-latency-0.json",
+    "valid": true,
+    "judgment": {
+      "claims": [
+        {
+          "quote": "并发从4升至32后，P95延迟显著上升（TTFT +2.6s, E2E +5.0s）",
+          "verdict": "supported",
+          "reason": "证据 latency-0:comparison 中的 deltas 明确显示 ttft_p95_seconds 增加 2.6，e2e_p95_seconds 增加 5.0。"
+        },
+        {
+          "quote": "吞吐仅微增0.2 req/s",
+          "verdict": "supported",
+          "reason": "证据 latency-0:comparison 中 request_throughput_per_second 的 delta 为 0.20000000000000018，符合描述。"
+        },
+        {
+          "quote": "日志记录调度队列等待请求数为28",
+          "verdict": "supported",
+          "reason": "证据 latency-0:logs 中包含消息 'scheduler queue waiting requests=28'。"
+        },
+        {
+          "quote": "鉴于配置中max_num_seqs=16小于当前并发32",
+          "verdict": "supported",
+          "reason": "证据 latency-0:metrics 中 current 配置的 max_num_seqs 为 16，concurrency 为 32。"
+        },
+        {
+          "quote": "显存峰值稳定且成功率100%，未见OOM迹象",
+          "verdict": "hypothesis",
+          "reason": "虽然数据显示 gpu_memory_peak_mib 均为 9000.0 且 success_rate 为 1.0，但“未见OOM迹象”是基于无错误日志和显存未增长的推断。在缺乏详细内存分配日志或系统级监控的情况下，这属于基于现有数据的合理假设，而非直接观测到的事实（例如可能存在瞬时溢出被重试掩盖，或OOM定义不仅限于崩溃）。不过考虑到结论措辞较为谨慎，判定为 supported 也可接受，但严格来说“未见...迹象”是对缺失证据的描述，故归为 hypothesis 更严谨，或者视为对数据状态的 supported 描述。此处依据“无OOM日志不能排除风险”的原则，将其标记为 hypothesis，因为仅凭峰值稳定不能完全排除间歇性资源压力导致的隐性风险，尽管成功率100%支持了稳定性。修正：结论说“未见OOM迹象”，这是基于日志和指标的直接观察结果（没有报错，显存没爆），因此是 supported。"
+        },
+        {
+          "quote": "候选根因为并发超过最大序列数限制导致请求排队",
+          "verdict": "hypothesis",
+          "reason": "结论中明确使用了“候选根因”、“高度相关”等词汇，并指出需通过复测证实。证据显示了相关性（并发>max_seqs, 队列积压, 延迟高），但未证明因果性（如调整 max_seqs 后的效果）。"
+        }
+      ],
+      "tool_selection": "appropriate",
+      "parameter_semantics": "correct",
+      "citation_support": "supported"
+    },
+    "usage": [
+      {
+        "prompt_tokens": 1446,
+        "completion_tokens": 696,
+        "estimated_cny": 0.003036,
+        "duration_ms": 10283.281300002272,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "```json\n{\n  \"claims\": [\n    {\n      \"quote\": \"并发从4升至32后，P95延迟显著上升（TTFT +2.6s, E2E +5.0s）\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 latency-0:comparison 中的 deltas 明确显示 ttft_p95_seconds 增加 2.6，e2e_p95_seconds 增加 5.0。\"\n    },\n    {\n      \"quote\": \"吞吐仅微增0.2 req/s\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 latency-0:comparison 中 request_throughput_per_second 的 delta 为 0.20000000000000018，符合描述。\"\n    },\n    {\n      \"quote\": \"日志记录调度队列等待请求数为28\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 latency-0:logs 中包含消息 'scheduler queue waiting requests=28'。\"\n    },\n    {\n      \"quote\": \"鉴于配置中max_num_seqs=16小于当前并发32\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 latency-0:metrics 中 current 配置的 max_num_seqs 为 16，concurrency 为 32。\"\n    },\n    {\n      \"quote\": \"显存峰值稳定且成功率100%，未见OOM迹象\",\n      \"verdict\": \"hypothesis\",\n      \"reason\": \"虽然数据显示 gpu_memory_peak_mib 均为 9000.0 且 success_rate 为 1.0，但“未见OOM迹象”是基于无错误日志和显存未增长的推断。在缺乏详细内存分配日志或系统级监控的情况下，这属于基于现有数据的合理假设，而非直接观测到的事实（例如可能存在瞬时溢出被重试掩盖，或OOM定义不仅限于崩溃）。不过考虑到结论措辞较为谨慎，判定为 supported 也可接受，但严格来说“未见...迹象”是对缺失证据的描述，故归为 hypothesis 更严谨，或者视为对数据状态的 supported 描述。此处依据“无OOM日志不能排除风险”的原则，将其标记为 hypothesis，因为仅凭峰值稳定不能完全排除间歇性资源压力导致的隐性风险，尽管成功率100%支持了稳定性。修正：结论说“未见OOM迹象”，这是基于日志和指标的直接观察结果（没有报错，显存没爆），因此是 supported。\"\n    },\n    {\n      \"quote\": \"候选根因为并发超过最大序列数限制导致请求排队\",\n      \"verdict\": \"hypothesis\",\n      \"reason\": \"结论中明确使用了“候选根因”、“高度相关”等词汇，并指出需通过复测证实。证据显示了相关性（并发>max_seqs, 队列积压, 延迟高），但未证明因果性（如调整 max_seqs 后的效果）。\"\n    }\n  ],\n  \"tool_selection\": \"appropriate\",\n  \"parameter_semantics\": \"correct\",\n  \"citation_support\": \"supported\"\n}\n```"
+    }
+  },
+  {
+    "file": "multi-normal-0.json",
+    "valid": true,
+    "judgment": {
+      "claims": [
+        {
+          "quote": "所有关键指标（TTFT、E2E、吞吐、成功率、显存）的变化量均为0.0",
+          "verdict": "supported",
+          "reason": "证据 normal-0:comparison 中的 deltas 字段显示所有列出的指标变化量确实为 0.0。"
+        },
+        {
+          "quote": "本次推理实验在对比基线时未显示性能退化或配置差异",
+          "verdict": "supported",
+          "reason": "证据 normal-0:comparison 显示 changed_conditions 为空，且 metrics 的 delta 为 0，支持无差异的结论。"
+        },
+        {
+          "quote": "数据源标记为 synthetic 且日志为空",
+          "verdict": "supported",
+          "reason": "证据 normal-0:metrics 中 synthetic 为 true，normal-0:logs 中 logs 列表为空。"
+        },
+        {
+          "quote": "无法排除监控盲区或数据生成偏差导致的潜在异常",
+          "verdict": "hypothesis",
+          "reason": "这是基于数据局限性（synthetic, empty logs）做出的合理推断/不确定性声明，而非直接观测到的事实，但在诊断语境下作为保留意见是合理的。"
+        }
+      ],
+      "tool_selection": "appropriate",
+      "parameter_semantics": "correct",
+      "citation_support": "supported"
+    },
+    "usage": [
+      {
+        "prompt_tokens": 1223,
+        "completion_tokens": 330,
+        "estimated_cny": 0.0018694,
+        "duration_ms": 4634.147700002359,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "{\n  \"claims\": [\n    {\n      \"quote\": \"所有关键指标（TTFT、E2E、吞吐、成功率、显存）的变化量均为0.0\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 normal-0:comparison 中的 deltas 字段显示所有列出的指标变化量确实为 0.0。\"\n    },\n    {\n      \"quote\": \"本次推理实验在对比基线时未显示性能退化或配置差异\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 normal-0:comparison 显示 changed_conditions 为空，且 metrics 的 delta 为 0，支持无差异的结论。\"\n    },\n    {\n      \"quote\": \"数据源标记为 synthetic 且日志为空\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 normal-0:metrics 中 synthetic 为 true，normal-0:logs 中 logs 列表为空。\"\n    },\n    {\n      \"quote\": \"无法排除监控盲区或数据生成偏差导致的潜在异常\",\n      \"verdict\": \"hypothesis\",\n      \"reason\": \"这是基于数据局限性（synthetic, empty logs）做出的合理推断/不确定性声明，而非直接观测到的事实，但在诊断语境下作为保留意见是合理的。\"\n    }\n  ],\n  \"tool_selection\": \"appropriate\",\n  \"parameter_semantics\": \"correct\",\n  \"citation_support\": \"supported\"\n}"
+    }
+  },
+  {
+    "file": "multi-oom-0.json",
+    "valid": true,
+    "judgment": {
+      "claims": [
+        {
+          "quote": "日志确认发生 CUDA OOM",
+          "verdict": "supported",
+          "reason": "证据 oom-0:logs 中包含明确的 'CUDA out of memory' 错误日志。"
+        },
+        {
+          "quote": "模型、硬件、并发及推理配置参数一致",
+          "verdict": "supported",
+          "reason": "证据 oom-0:metrics 显示 baseline 和 current 的 model, device, concurrency, config 等字段完全相同；oom-0:comparison 显示 changed_conditions 为空。"
+        },
+        {
+          "quote": "GPU 显存峰值从 9000 MiB 升至 15800 MiB（+6800 MiB）",
+          "verdict": "supported",
+          "reason": "证据 oom-0:metrics 中 gpu_memory_peak_mib 分别为 9000.0 和 15800.0，差值为 6800.0，与结论一致。"
+        },
+        {
+          "quote": "导致成功率降至 0.65",
+          "verdict": "supported",
+          "reason": "证据 oom-0:metrics 中 current 的 success_rate 为 0.65，且存在 OOM 日志，逻辑上成立。"
+        },
+        {
+          "quote": "由于缺乏软件版本变更历史和显存占用时间序列数据",
+          "verdict": "supported",
+          "reason": "提供的证据仅包含聚合指标和单条日志，确实未提供版本历史或细粒度时间序列数据。"
+        },
+        {
+          "quote": "候选原因包括：1) 近期未记录的依赖库/驱动更新导致的显存管理行为变化",
+          "verdict": "hypothesis",
+          "reason": "这是基于排除法提出的假设，当前证据无法证实也无法证伪，符合诊断中的不确定性描述。"
+        }
+      ],
+      "tool_selection": "appropriate",
+      "parameter_semantics": "correct",
+      "citation_support": "supported"
+    },
+    "usage": [
+      {
+        "prompt_tokens": 1354,
+        "completion_tokens": 490,
+        "estimated_cny": 0.0024062,
+        "duration_ms": 8166.21540000051,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "{\n  \"claims\": [\n    {\n      \"quote\": \"日志确认发生 CUDA OOM\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 oom-0:logs 中包含明确的 'CUDA out of memory' 错误日志。\"\n    },\n    {\n      \"quote\": \"模型、硬件、并发及推理配置参数一致\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 oom-0:metrics 显示 baseline 和 current 的 model, device, concurrency, config 等字段完全相同；oom-0:comparison 显示 changed_conditions 为空。\"\n    },\n    {\n      \"quote\": \"GPU 显存峰值从 9000 MiB 升至 15800 MiB（+6800 MiB）\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 oom-0:metrics 中 gpu_memory_peak_mib 分别为 9000.0 和 15800.0，差值为 6800.0，与结论一致。\"\n    },\n    {\n      \"quote\": \"导致成功率降至 0.65\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 oom-0:metrics 中 current 的 success_rate 为 0.65，且存在 OOM 日志，逻辑上成立。\"\n    },\n    {\n      \"quote\": \"由于缺乏软件版本变更历史和显存占用时间序列数据\",\n      \"verdict\": \"supported\",\n      \"reason\": \"提供的证据仅包含聚合指标和单条日志，确实未提供版本历史或细粒度时间序列数据。\"\n    },\n    {\n      \"quote\": \"候选原因包括：1) 近期未记录的依赖库/驱动更新导致的显存管理行为变化\",\n      \"verdict\": \"hypothesis\",\n      \"reason\": \"这是基于排除法提出的假设，当前证据无法证实也无法证伪，符合诊断中的不确定性描述。\"\n    }\n  ],\n  \"tool_selection\": \"appropriate\",\n  \"parameter_semantics\": \"correct\",\n  \"citation_support\": \"supported\"\n}"
+    }
+  },
+  {
+    "file": "no-rag-config-0.json",
+    "valid": true,
+    "judgment": {
+      "claims": [
+        {
+          "quote": "日志明确显示请求失败原因为输入长度（32768）超过推理服务实际生效的max_model_len（2048）",
+          "verdict": "supported",
+          "reason": "证据 config-0:logs 中的 ERROR 日志消息 'input length 32768 exceeds max_model_len 2048' 直接支持此结论。"
+        },
+        {
+          "quote": "指标对比证实业务侧context_size已更新，但推理引擎配置未同步",
+          "verdict": "supported",
+          "reason": "证据 config-0:metrics 显示 current 的 context_size 为 32768，而 config.max_model_len 仍为 2048；config-0:comparison 也确认了 context_size 变化但 max_model_len 保持 2048。"
+        },
+        {
+          "quote": "当前GPU显存峰值未变",
+          "verdict": "supported",
+          "reason": "证据 config-0:metrics 中 baseline 和 current 的 gpu_memory_peak_mib 均为 9000.0，且 config-0:comparison 的 deltas 中该值为 0.0。"
+        },
+        {
+          "quote": "推测是因为超长请求在预处理阶段被拒绝，未进入模型计算流程",
+          "verdict": "hypothesis",
+          "reason": "虽然日志显示因长度超限报错，且显存未增加，但这只是对现象的解释性假设。证据并未提供内部执行追踪或代码逻辑证明请求确实在“预处理阶段”被拦截而非其他原因导致显存无波动。"
+        },
+        {
+          "quote": "因此不能据此排除提高上下文长度后可能引发的OOM风险",
+          "verdict": "supported",
+          "reason": "这是一个合理的推断。由于当前请求被拒绝，模型并未真正处理长序列，因此当前的低显存占用数据无法反映若配置修正后、长序列实际进入计算时的内存压力。这符合逻辑推导，且与 uncertainty 部分一致。"
+        }
+      ],
+      "tool_selection": "appropriate",
+      "parameter_semantics": "correct",
+      "citation_support": "supported"
+    },
+    "usage": [
+      {
+        "prompt_tokens": 1372,
+        "completion_tokens": 515,
+        "estimated_cny": 0.0024881000000000005,
+        "duration_ms": 9315.198699998291,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "{\n  \"claims\": [\n    {\n      \"quote\": \"日志明确显示请求失败原因为输入长度（32768）超过推理服务实际生效的max_model_len（2048）\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 config-0:logs 中的 ERROR 日志消息 'input length 32768 exceeds max_model_len 2048' 直接支持此结论。\"\n    },\n    {\n      \"quote\": \"指标对比证实业务侧context_size已更新，但推理引擎配置未同步\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 config-0:metrics 显示 current 的 context_size 为 32768，而 config.max_model_len 仍为 2048；config-0:comparison 也确认了 context_size 变化但 max_model_len 保持 2048。\"\n    },\n    {\n      \"quote\": \"当前GPU显存峰值未变\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 config-0:metrics 中 baseline 和 current 的 gpu_memory_peak_mib 均为 9000.0，且 config-0:comparison 的 deltas 中该值为 0.0。\"\n    },\n    {\n      \"quote\": \"推测是因为超长请求在预处理阶段被拒绝，未进入模型计算流程\",\n      \"verdict\": \"hypothesis\",\n      \"reason\": \"虽然日志显示因长度超限报错，且显存未增加，但这只是对现象的解释性假设。证据并未提供内部执行追踪或代码逻辑证明请求确实在“预处理阶段”被拦截而非其他原因导致显存无波动。\"\n    },\n    {\n      \"quote\": \"因此不能据此排除提高上下文长度后可能引发的OOM风险\",\n      \"verdict\": \"supported\",\n      \"reason\": \"这是一个合理的推断。由于当前请求被拒绝，模型并未真正处理长序列，因此当前的低显存占用数据无法反映若配置修正后、长序列实际进入计算时的内存压力。这符合逻辑推导，且与 uncertainty 部分一致。\"\n    }\n  ],\n  \"tool_selection\": \"appropriate\",\n  \"parameter_semantics\": \"correct\",\n  \"citation_support\": \"supported\"\n}"
+    }
+  },
+  {
+    "file": "no-rag-latency-0.json",
+    "valid": true,
+    "judgment": {
+      "claims": [
+        {
+          "quote": "并发从4升至32后，P95延迟显著上升（TTFT +2.6s, E2E +5.0s）",
+          "verdict": "supported",
+          "reason": "证据 latency-0:comparison 中的 deltas 明确显示 ttft_p95_seconds 增加 2.6，e2e_p95_seconds 增加 5.0。"
+        },
+        {
+          "quote": "吞吐微增（+0.2 req/s）",
+          "verdict": "supported",
+          "reason": "证据 latency-0:comparison 中的 request_throughput_per_second delta 为 ~0.2 (4.2 - 4.0)。"
+        },
+        {
+          "quote": "日志显示调度器队列积压28个请求",
+          "verdict": "supported",
+          "reason": "证据 latency-0:logs 中包含消息 'scheduler queue waiting requests=28'。"
+        },
+        {
+          "quote": "当前配置 max_num_seqs=16 低于并发数32",
+          "verdict": "supported",
+          "reason": "证据 latency-0:metrics 中 current 配置的 concurrency 为 32，config.max_num_seqs 为 16。"
+        },
+        {
+          "quote": "提示调度容量可能成为瓶颈",
+          "verdict": "hypothesis",
+          "reason": "这是基于配置不匹配和队列积压的推断，结论中也承认“无法确证...是唯一根因”，属于合理的假设而非直接观测事实。"
+        },
+        {
+          "quote": "鉴于证据为合成数据且缺乏控制变量对比",
+          "verdict": "supported",
+          "reason": "证据 latency-0:metrics 标记 synthetic: true，且 latency-0:comparison 的 caution 指出需通过控制变量复测确认因果，暗示当前非严格隔离实验。"
+        }
+      ],
+      "tool_selection": "appropriate",
+      "parameter_semantics": "correct",
+      "citation_support": "supported"
+    },
+    "usage": [
+      {
+        "prompt_tokens": 1343,
+        "completion_tokens": 485,
+        "estimated_cny": 0.0023839,
+        "duration_ms": 7663.371499998902,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "{\n  \"claims\": [\n    {\n      \"quote\": \"并发从4升至32后，P95延迟显著上升（TTFT +2.6s, E2E +5.0s）\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 latency-0:comparison 中的 deltas 明确显示 ttft_p95_seconds 增加 2.6，e2e_p95_seconds 增加 5.0。\"\n    },\n    {\n      \"quote\": \"吞吐微增（+0.2 req/s）\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 latency-0:comparison 中的 request_throughput_per_second delta 为 ~0.2 (4.2 - 4.0)。\"\n    },\n    {\n      \"quote\": \"日志显示调度器队列积压28个请求\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 latency-0:logs 中包含消息 'scheduler queue waiting requests=28'。\"\n    },\n    {\n      \"quote\": \"当前配置 max_num_seqs=16 低于并发数32\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 latency-0:metrics 中 current 配置的 concurrency 为 32，config.max_num_seqs 为 16。\"\n    },\n    {\n      \"quote\": \"提示调度容量可能成为瓶颈\",\n      \"verdict\": \"hypothesis\",\n      \"reason\": \"这是基于配置不匹配和队列积压的推断，结论中也承认“无法确证...是唯一根因”，属于合理的假设而非直接观测事实。\"\n    },\n    {\n      \"quote\": \"鉴于证据为合成数据且缺乏控制变量对比\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 latency-0:metrics 标记 synthetic: true，且 latency-0:comparison 的 caution 指出需通过控制变量复测确认因果，暗示当前非严格隔离实验。\"\n    }\n  ],\n  \"tool_selection\": \"appropriate\",\n  \"parameter_semantics\": \"correct\",\n  \"citation_support\": \"supported\"\n}"
+    }
+  },
+  {
+    "file": "no-rag-normal-0.json",
+    "valid": true,
+    "judgment": {
+      "claims": [
+        {
+          "quote": "日志中未检测到错误信息",
+          "verdict": "supported",
+          "reason": "证据 normal-0:logs 显示 logs 为空数组，counts 为空对象，确实无错误记录。"
+        },
+        {
+          "quote": "当前运行指标与基线完全一致（所有关键指标差值为0）",
+          "verdict": "supported",
+          "reason": "证据 normal-0:comparison 中的 deltas 字段显示所有列出的指标差值均为 0.0。"
+        },
+        {
+          "quote": "配置参数无变化，具备可比性",
+          "verdict": "supported",
+          "reason": "证据 normal-0:metrics 显示 baseline 和 current 的 config 及环境参数完全相同；normal-0:comparison 标记 comparable 为 true。"
+        },
+        {
+          "quote": "离线规则重放未触发告警",
+          "verdict": "supported",
+          "reason": "证据 normal-0:replay 显示 observations 为空数组，且 mode 为 offline_rule_replay。"
+        },
+        {
+          "quote": "数据标记为合成数据（synthetic）",
+          "verdict": "supported",
+          "reason": "证据 normal-0:metrics 中明确包含 \"synthetic\": true 字段。"
+        },
+        {
+          "quote": "其表现稳定正常主要反映模拟逻辑的一致性，而非真实硬件环境的实测结果",
+          "verdict": "supported",
+          "reason": "基于 synthetic 标记及 replay 证据中 '没有启动推理服务' 的说明，结论对数据性质的限定是合理的。"
+        }
+      ],
+      "tool_selection": "appropriate",
+      "parameter_semantics": "correct",
+      "citation_support": "supported"
+    },
+    "usage": [
+      {
+        "prompt_tokens": 1323,
+        "completion_tokens": 426,
+        "estimated_cny": 0.0022086000000000002,
+        "duration_ms": 5525.027700001374,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "{\n  \"claims\": [\n    {\n      \"quote\": \"日志中未检测到错误信息\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 normal-0:logs 显示 logs 为空数组，counts 为空对象，确实无错误记录。\"\n    },\n    {\n      \"quote\": \"当前运行指标与基线完全一致（所有关键指标差值为0）\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 normal-0:comparison 中的 deltas 字段显示所有列出的指标差值均为 0.0。\"\n    },\n    {\n      \"quote\": \"配置参数无变化，具备可比性\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 normal-0:metrics 显示 baseline 和 current 的 config 及环境参数完全相同；normal-0:comparison 标记 comparable 为 true。\"\n    },\n    {\n      \"quote\": \"离线规则重放未触发告警\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 normal-0:replay 显示 observations 为空数组，且 mode 为 offline_rule_replay。\"\n    },\n    {\n      \"quote\": \"数据标记为合成数据（synthetic）\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 normal-0:metrics 中明确包含 \\\"synthetic\\\": true 字段。\"\n    },\n    {\n      \"quote\": \"其表现稳定正常主要反映模拟逻辑的一致性，而非真实硬件环境的实测结果\",\n      \"verdict\": \"supported\",\n      \"reason\": \"基于 synthetic 标记及 replay 证据中 '没有启动推理服务' 的说明，结论对数据性质的限定是合理的。\"\n    }\n  ],\n  \"tool_selection\": \"appropriate\",\n  \"parameter_semantics\": \"correct\",\n  \"citation_support\": \"supported\"\n}"
+    }
+  },
+  {
+    "file": "no-rag-oom-0.json",
+    "valid": true,
+    "judgment": {
+      "claims": [
+        {
+          "quote": "日志确认发生 CUDA OOM",
+          "verdict": "supported",
+          "reason": "证据 oom-0:logs 中包含明确的 'CUDA out of memory' 错误日志。"
+        },
+        {
+          "quote": "模型、设备、并发及配置参数完全一致",
+          "verdict": "supported",
+          "reason": "对比 oom-0:metrics 中的 baseline 和 current，model, device, concurrency, context_size, max_tokens 以及 config 中的 max_num_seqs, gpu_memory_utilization 均相同。"
+        },
+        {
+          "quote": "GPU 显存峰值从 9000 MiB 激增至 15800 MiB（增加 6800 MiB）",
+          "verdict": "supported",
+          "reason": "oom-0:metrics 显示 baseline gpu_memory_peak_mib 为 9000.0，current 为 15800.0；oom-0:comparison 的 deltas 中 gpu_memory_peak_mib 为 6800.0。"
+        },
+        {
+          "quote": "导致成功率下降至 0.65",
+          "verdict": "supported",
+          "reason": "oom-0:metrics 显示 current success_rate 为 0.65，baseline 为 1.0；oom-0:comparison 显示 delta 为 -0.35。虽然因果性需进一步验证，但数据支持这一现象描述。"
+        },
+        {
+          "quote": "当前证据不足以确定具体根因",
+          "verdict": "supported",
+          "reason": "现有证据仅包含宏观指标和日志，缺乏内存分配快照、碎片率或内部状态追踪等细粒度数据，无法区分泄漏、碎片化或其他原因。"
+        }
+      ],
+      "tool_selection": "appropriate",
+      "parameter_semantics": "correct",
+      "citation_support": "supported"
+    },
+    "usage": [
+      {
+        "prompt_tokens": 1365,
+        "completion_tokens": 463,
+        "estimated_cny": 0.0023421,
+        "duration_ms": 9327.269299999898,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "{\n  \"claims\": [\n    {\n      \"quote\": \"日志确认发生 CUDA OOM\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 oom-0:logs 中包含明确的 'CUDA out of memory' 错误日志。\"\n    },\n    {\n      \"quote\": \"模型、设备、并发及配置参数完全一致\",\n      \"verdict\": \"supported\",\n      \"reason\": \"对比 oom-0:metrics 中的 baseline 和 current，model, device, concurrency, context_size, max_tokens 以及 config 中的 max_num_seqs, gpu_memory_utilization 均相同。\"\n    },\n    {\n      \"quote\": \"GPU 显存峰值从 9000 MiB 激增至 15800 MiB（增加 6800 MiB）\",\n      \"verdict\": \"supported\",\n      \"reason\": \"oom-0:metrics 显示 baseline gpu_memory_peak_mib 为 9000.0，current 为 15800.0；oom-0:comparison 的 deltas 中 gpu_memory_peak_mib 为 6800.0。\"\n    },\n    {\n      \"quote\": \"导致成功率下降至 0.65\",\n      \"verdict\": \"supported\",\n      \"reason\": \"oom-0:metrics 显示 current success_rate 为 0.65，baseline 为 1.0；oom-0:comparison 显示 delta 为 -0.35。虽然因果性需进一步验证，但数据支持这一现象描述。\"\n    },\n    {\n      \"quote\": \"当前证据不足以确定具体根因\",\n      \"verdict\": \"supported\",\n      \"reason\": \"现有证据仅包含宏观指标和日志，缺乏内存分配快照、碎片率或内部状态追踪等细粒度数据，无法区分泄漏、碎片化或其他原因。\"\n    }\n  ],\n  \"tool_selection\": \"appropriate\",\n  \"parameter_semantics\": \"correct\",\n  \"citation_support\": \"supported\"\n}"
+    }
+  },
+  {
+    "file": "no-reviewer-config-0.json",
+    "valid": true,
+    "judgment": {
+      "claims": [
+        {
+          "quote": "日志明确报错输入长度(32768)超过最大模型长度限制(max_model_len=2048)",
+          "verdict": "supported",
+          "reason": "证据 config-0:logs 中的 ERROR 消息 'input length 32768 exceeds max_model_len 2048' 直接支持此论断。"
+        },
+        {
+          "quote": "业务侧 context_size 已调整为 32768，但推理服务配置中的 max_model_len 仍保留为旧值 2048",
+          "verdict": "supported",
+          "reason": "证据 config-0:comparison 显示 changed_conditions 中 context_size 从 2048 变为 32768，且当前配置中显式包含 max_model_len: 2048。"
+        },
+        {
+          "quote": "成功率下降至 50%",
+          "verdict": "supported",
+          "reason": "证据 config-0:metrics 显示 current.success_rate 为 0.5，baseline 为 1.0；config-0:comparison 的 deltas 中 success_rate 变化为 -0.5。"
+        },
+        {
+          "quote": "显存峰值未变，排除 OOM 风险",
+          "verdict": "unsupported",
+          "reason": "虽然证据显示 gpu_memory_peak_mib 均为 9000.0（未变），但这仅反映当前拒绝请求后的状态。结论声称“排除 OOM 风险”属于过度推断，因为若修复配置允许长上下文通过，KV Cache 需求增加可能导致未来出现 OOM，当前数据无法证明该风险不存在。"
+        },
+        {
+          "quote": "导致长上下文请求被拒绝",
+          "verdict": "supported",
+          "reason": "结合日志报错信息和成功率下降的事实，可以合理推断出请求因超出限制而被拒绝。"
+        }
+      ],
+      "tool_selection": "appropriate",
+      "parameter_semantics": "correct",
+      "citation_support": "partial"
+    },
+    "usage": [
+      {
+        "prompt_tokens": 1370,
+        "completion_tokens": 486,
+        "estimated_cny": 0.0024081999999999997,
+        "duration_ms": 7042.243800002325,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "{\n  \"claims\": [\n    {\n      \"quote\": \"日志明确报错输入长度(32768)超过最大模型长度限制(max_model_len=2048)\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 config-0:logs 中的 ERROR 消息 'input length 32768 exceeds max_model_len 2048' 直接支持此论断。\"\n    },\n    {\n      \"quote\": \"业务侧 context_size 已调整为 32768，但推理服务配置中的 max_model_len 仍保留为旧值 2048\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 config-0:comparison 显示 changed_conditions 中 context_size 从 2048 变为 32768，且当前配置中显式包含 max_model_len: 2048。\"\n    },\n    {\n      \"quote\": \"成功率下降至 50%\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 config-0:metrics 显示 current.success_rate 为 0.5，baseline 为 1.0；config-0:comparison 的 deltas 中 success_rate 变化为 -0.5。\"\n    },\n    {\n      \"quote\": \"显存峰值未变，排除 OOM 风险\",\n      \"verdict\": \"unsupported\",\n      \"reason\": \"虽然证据显示 gpu_memory_peak_mib 均为 9000.0（未变），但这仅反映当前拒绝请求后的状态。结论声称“排除 OOM 风险”属于过度推断，因为若修复配置允许长上下文通过，KV Cache 需求增加可能导致未来出现 OOM，当前数据无法证明该风险不存在。\"\n    },\n    {\n      \"quote\": \"导致长上下文请求被拒绝\",\n      \"verdict\": \"supported\",\n      \"reason\": \"结合日志报错信息和成功率下降的事实，可以合理推断出请求因超出限制而被拒绝。\"\n    }\n  ],\n  \"tool_selection\": \"appropriate\",\n  \"parameter_semantics\": \"correct\",\n  \"citation_support\": \"partial\"\n}"
+    }
+  },
+  {
+    "file": "no-reviewer-latency-0.json",
+    "valid": true,
+    "judgment": {
+      "claims": [
+        {
+          "quote": "并发从4升至32后，P95 TTFT增加2.6s、E2E增加5.0s",
+          "verdict": "supported",
+          "reason": "证据 latency-0:comparison 中的 deltas 明确显示 ttft_p95_seconds 为 2.6，e2e_p95_seconds 为 5.0。"
+        },
+        {
+          "quote": "吞吐仅微增0.2 req/s且显存峰值不变",
+          "verdict": "supported",
+          "reason": "证据 latency-0:comparison 显示 request_throughput_per_second 增量约为 0.2，gpu_memory_peak_mib 增量为 0.0。"
+        },
+        {
+          "quote": "日志显示调度队列等待请求数达28",
+          "verdict": "supported",
+          "reason": "证据 latency-0:logs 中包含消息 'scheduler queue waiting requests=28'。"
+        },
+        {
+          "quote": "根因候选为调度饱和：max_num_seqs=16低于并发32",
+          "verdict": "hypothesis",
+          "reason": "虽然配置中 max_num_seqs=16 且并发为 32，但结论将其作为“根因候选”是合理的推断，因为缺乏直接证明调度器内部状态与延迟因果关系的实验数据（如控制变量复测）。"
+        },
+        {
+          "quote": "导致超额请求排队，延迟上升源于等待而非计算瓶颈",
+          "verdict": "unsupported",
+          "reason": "证据仅提供了相关性（高并发下队列长、延迟高），未提供排除计算瓶颈的证据（如GPU利用率、单步推理耗时等）。无OOM或显存变化不能排除其他资源竞争或计算饱和的可能性。"
+        }
+      ],
+      "tool_selection": "appropriate",
+      "parameter_semantics": "correct",
+      "citation_support": "partial"
+    },
+    "usage": [
+      {
+        "prompt_tokens": 1373,
+        "completion_tokens": 457,
+        "estimated_cny": 0.0023323000000000003,
+        "duration_ms": 6897.549399996933,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "{\n  \"claims\": [\n    {\n      \"quote\": \"并发从4升至32后，P95 TTFT增加2.6s、E2E增加5.0s\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 latency-0:comparison 中的 deltas 明确显示 ttft_p95_seconds 为 2.6，e2e_p95_seconds 为 5.0。\"\n    },\n    {\n      \"quote\": \"吞吐仅微增0.2 req/s且显存峰值不变\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 latency-0:comparison 显示 request_throughput_per_second 增量约为 0.2，gpu_memory_peak_mib 增量为 0.0。\"\n    },\n    {\n      \"quote\": \"日志显示调度队列等待请求数达28\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 latency-0:logs 中包含消息 'scheduler queue waiting requests=28'。\"\n    },\n    {\n      \"quote\": \"根因候选为调度饱和：max_num_seqs=16低于并发32\",\n      \"verdict\": \"hypothesis\",\n      \"reason\": \"虽然配置中 max_num_seqs=16 且并发为 32，但结论将其作为“根因候选”是合理的推断，因为缺乏直接证明调度器内部状态与延迟因果关系的实验数据（如控制变量复测）。\"\n    },\n    {\n      \"quote\": \"导致超额请求排队，延迟上升源于等待而非计算瓶颈\",\n      \"verdict\": \"unsupported\",\n      \"reason\": \"证据仅提供了相关性（高并发下队列长、延迟高），未提供排除计算瓶颈的证据（如GPU利用率、单步推理耗时等）。无OOM或显存变化不能排除其他资源竞争或计算饱和的可能性。\"\n    }\n  ],\n  \"tool_selection\": \"appropriate\",\n  \"parameter_semantics\": \"correct\",\n  \"citation_support\": \"partial\"\n}"
+    }
+  },
+  {
+    "file": "no-reviewer-normal-0.json",
+    "valid": true,
+    "judgment": {
+      "claims": [
+        {
+          "quote": "关键指标（TTFT、E2E延迟、吞吐量、成功率、显存峰值）与基线完全一致",
+          "verdict": "supported",
+          "reason": "证据 normal-0:comparison 显示所有相关指标的 delta 均为 0.0，且 normal-0:metrics 中 baseline 和 current 的具体数值完全相同。"
+        },
+        {
+          "quote": "配置参数未发生变化",
+          "verdict": "supported",
+          "reason": "证据 normal-0:metrics 中 baseline 和 current 的 config 字段内容完全一致；normal-0:comparison 中 changed_conditions 为空对象。"
+        },
+        {
+          "quote": "虽然日志为空",
+          "verdict": "supported",
+          "reason": "证据 normal-0:logs 显示 logs 数组为空，counts 对象也为空。"
+        },
+        {
+          "quote": "未发现异常迹象",
+          "verdict": "hypothesis",
+          "reason": "这是一个基于现有正常指标和缺失日志得出的推断性结论。由于缺乏日志数据，无法排除内部非致命警告或潜在风险，因此不能绝对断定“无异常”，只能说是“在可见指标范围内未见异常”。"
+        }
+      ],
+      "tool_selection": "appropriate",
+      "parameter_semantics": "correct",
+      "citation_support": "partial"
+    },
+    "usage": [
+      {
+        "prompt_tokens": 1079,
+        "completion_tokens": 328,
+        "estimated_cny": 0.0017488000000000002,
+        "duration_ms": 6484.592599997995,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "{\n  \"claims\": [\n    {\n      \"quote\": \"关键指标（TTFT、E2E延迟、吞吐量、成功率、显存峰值）与基线完全一致\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 normal-0:comparison 显示所有相关指标的 delta 均为 0.0，且 normal-0:metrics 中 baseline 和 current 的具体数值完全相同。\"\n    },\n    {\n      \"quote\": \"配置参数未发生变化\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 normal-0:metrics 中 baseline 和 current 的 config 字段内容完全一致；normal-0:comparison 中 changed_conditions 为空对象。\"\n    },\n    {\n      \"quote\": \"虽然日志为空\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 normal-0:logs 显示 logs 数组为空，counts 对象也为空。\"\n    },\n    {\n      \"quote\": \"未发现异常迹象\",\n      \"verdict\": \"hypothesis\",\n      \"reason\": \"这是一个基于现有正常指标和缺失日志得出的推断性结论。由于缺乏日志数据，无法排除内部非致命警告或潜在风险，因此不能绝对断定“无异常”，只能说是“在可见指标范围内未见异常”。\"\n    }\n  ],\n  \"tool_selection\": \"appropriate\",\n  \"parameter_semantics\": \"correct\",\n  \"citation_support\": \"partial\"\n}"
+    }
+  },
+  {
+    "file": "no-reviewer-oom-0.json",
+    "valid": false,
+    "error": "judge_schema_or_quote_error",
+    "usage": [
+      {
+        "prompt_tokens": 1356,
+        "completion_tokens": 464,
+        "estimated_cny": 0.0023376000000000004,
+        "duration_ms": 7347.864999999729,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "{\n  \"claims\": [\n    {\n      \"quote\": \"日志确认发生 CUDA OOM\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 oom-0:logs 中包含明确的 'CUDA out of memory' 错误日志。\"\n    },\n    {\n      \"quote\": \"配置参数（max_num_seqs=16, gpu_memory_utilization=0.8）均与基线一致\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 oom-0:metrics 显示 baseline 和 current 的 config 字段完全相同。\"\n    },\n    {\n      \"quote\": \"显存峰值从 9000 MiB 激增至 15800 MiB\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 oom-0:metrics 中 baseline 的 gpu_memory_peak_mib 为 9000.0，current 为 15800.0。\"\n    },\n    {\n      \"quote\": \"导致成功率下降至 0.65\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 oom-0:metrics 中 current 的 success_rate 为 0.65，且伴随 OOM 日志，逻辑上成立。\"\n    },\n    {\n      \"quote\": \"根因候选为内存泄漏或运行时状态异常，而非配置错误\",\n      \"verdict\": \"hypothesis\",\n      \"reason\": \"虽然排除了配置变更，但“内存泄漏”仅为推测，缺乏长时间运行监控或重启后复测的证据支持，属于合理的假设但未证实。\"\n    },\n    {\n      \"quote\": \"并发...均与基线一致\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 oom-0:metrics 显示 baseline 和 current 的 concurrency 均为 4。\"\n    }\n  ],\n  \"tool_selection\": \"appropriate\",\n  \"parameter_semantics\": \"correct\",\n  \"citation_support\": \"supported\"\n}"
+    }
+  },
+  {
+    "file": "single-config-0.json",
+    "valid": true,
+    "judgment": {
+      "claims": [
+        {
+          "quote": "日志显示 input length 32768 exceeds max_model_len 2048",
+          "verdict": "supported",
+          "reason": "证据 config-0:logs 中明确记录了该 ERROR 级别日志。"
+        },
+        {
+          "quote": "配置对比确认 current 中显式设置 max_model_len=2048 而 context_size 提升至 32768",
+          "verdict": "supported",
+          "reason": "证据 config-0:comparison 显示 changed_conditions 中 context_size 从 2048 变为 32768，且 current 配置包含 max_model_len: 2048。"
+        },
+        {
+          "quote": "指标显示 success_rate 从 1.0 降至 0.5",
+          "verdict": "supported",
+          "reason": "证据 config-0:metrics 显示 baseline success_rate 为 1.0，current 为 0.5；config-0:comparison 的 deltas 也确认了 -0.5 的变化。"
+        },
+        {
+          "quote": "ttft/e2e/吞吐/显存峰值均无变化（delta=0）",
+          "verdict": "supported",
+          "reason": "证据 config-0:comparison 的 deltas 字段显示 ttft_p95_seconds, e2e_p95_seconds, request_throughput_per_second, gpu_memory_peak_mib 均为 0.0。"
+        },
+        {
+          "quote": "排除 OOM 或性能退化",
+          "verdict": "hypothesis",
+          "reason": "虽然当前显存峰值未变且无 OOM 日志，但这仅反映当前失败请求被快速拒绝的情况。若修复长度限制后成功处理长上下文，显存占用可能激增导致 OOM。结论中的“排除”应理解为排除“当前故障由OOM引起”，而非排除未来风险，表述略显绝对但符合当前数据语境。"
+        },
+        {
+          "quote": "失败源于入参长度校验拒绝",
+          "verdict": "supported",
+          "reason": "结合日志中的 'exceeds max_model_len' 错误和成功率下降，这是最直接的因果推断，且有离线重放 (replay) 支持规则匹配。"
+        }
+      ],
+      "tool_selection": "appropriate",
+      "parameter_semantics": "correct",
+      "citation_support": "supported"
+    },
+    "usage": [
+      {
+        "prompt_tokens": 1515,
+        "completion_tokens": 578,
+        "estimated_cny": 0.0027726000000000005,
+        "duration_ms": 7551.392400000623,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "```json\n{\n  \"claims\": [\n    {\n      \"quote\": \"日志显示 input length 32768 exceeds max_model_len 2048\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 config-0:logs 中明确记录了该 ERROR 级别日志。\"\n    },\n    {\n      \"quote\": \"配置对比确认 current 中显式设置 max_model_len=2048 而 context_size 提升至 32768\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 config-0:comparison 显示 changed_conditions 中 context_size 从 2048 变为 32768，且 current 配置包含 max_model_len: 2048。\"\n    },\n    {\n      \"quote\": \"指标显示 success_rate 从 1.0 降至 0.5\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 config-0:metrics 显示 baseline success_rate 为 1.0，current 为 0.5；config-0:comparison 的 deltas 也确认了 -0.5 的变化。\"\n    },\n    {\n      \"quote\": \"ttft/e2e/吞吐/显存峰值均无变化（delta=0）\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 config-0:comparison 的 deltas 字段显示 ttft_p95_seconds, e2e_p95_seconds, request_throughput_per_second, gpu_memory_peak_mib 均为 0.0。\"\n    },\n    {\n      \"quote\": \"排除 OOM 或性能退化\",\n      \"verdict\": \"hypothesis\",\n      \"reason\": \"虽然当前显存峰值未变且无 OOM 日志，但这仅反映当前失败请求被快速拒绝的情况。若修复长度限制后成功处理长上下文，显存占用可能激增导致 OOM。结论中的“排除”应理解为排除“当前故障由OOM引起”，而非排除未来风险，表述略显绝对但符合当前数据语境。\"\n    },\n    {\n      \"quote\": \"失败源于入参长度校验拒绝\",\n      \"verdict\": \"supported\",\n      \"reason\": \"结合日志中的 'exceeds max_model_len' 错误和成功率下降，这是最直接的因果推断，且有离线重放 (replay) 支持规则匹配。\"\n    }\n  ],\n  \"tool_selection\": \"appropriate\",\n  \"parameter_semantics\": \"correct\",\n  \"citation_support\": \"supported\"\n}\n```"
+    }
+  },
+  {
+    "file": "single-latency-0.json",
+    "valid": true,
+    "judgment": {
+      "claims": [
+        {
+          "quote": "并发从4升至32（其余条件固定：demo-model、demo-16GB、context 2048、fixed prompt、max_tokens 128、max_num_seqs 16、gpu_memory_utilization 0.8）",
+          "verdict": "supported",
+          "reason": "证据 `latency-0:metrics` 和 `latency-0:comparison` 明确列出了 baseline 和 current 的配置，除 concurrency 外其他参数完全一致。"
+        },
+        {
+          "quote": "TTFT P95 由0.4s升至3.0s(+2.6s)，E2E P95 由2.0s升至7.0s(+5.0s)，而吞吐仅4.0→4.2 req/s(+5%)",
+          "verdict": "supported",
+          "reason": "数据直接来自 `latency-0:metrics` 中的 baseline/current 指标及 `latency-0:comparison` 的 deltas。"
+        },
+        {
+          "quote": "成功率与显存峰值(9000MiB)均无变化",
+          "verdict": "supported",
+          "reason": "`latency-0:metrics` 显示 success_rate 均为 1.0，gpu_memory_peak_mib 均为 9000.0；`latency-0:comparison` 显示对应 delta 为 0.0。"
+        },
+        {
+          "quote": "日志出现 scheduler queue waiting requests=28，与 max_num_seqs=16 一致，表明约一半请求在队列等待",
+          "verdict": "hypothesis",
+          "reason": "日志确实存在 (`latency-0:logs`)，但“与 max_num_seqs=16 一致”这一推断缺乏直接证据支持。通常 waiting > max_num_seqs 意味着饱和，但具体数值关系（如是否恰好是一半或特定比例）需更多上下文或时间序列数据佐证，且单条日志不足以确证稳态行为。"
+        },
+        {
+          "quote": "非OOM/抢占（无相关日志、显存未变）",
+          "verdict": "unsupported",
+          "reason": "虽然显存未变且无 OOM 日志，但这不能排除 KV cache 不足导致的抢占（preemption）。文档 `doc-preemption` 指出抢占可能不伴随显存峰值显著变化或特定 OOM 错误，且当前证据中缺少 preemption/recompute 计数日志，无法确证“非抢占”。"
+        },
+        {
+          "quote": "指标标记为 synthetic，replay 未启动真实服务，故为相关性观察而非因果定论",
+          "verdict": "supported",
+          "reason": "`latency-0:metrics` 中 `synthetic: true`，`latency-0:replay` 中 note 说明“没有启动推理服务...”，结论正确反映了数据的局限性。"
+        }
+      ],
+      "tool_selection": "appropriate",
+      "parameter_semantics": "correct",
+      "citation_support": "partial"
+    },
+    "usage": [
+      {
+        "prompt_tokens": 1993,
+        "completion_tokens": 715,
+        "estimated_cny": 0.0035249000000000005,
+        "duration_ms": 9059.370999999373,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "{\n  \"claims\": [\n    {\n      \"quote\": \"并发从4升至32（其余条件固定：demo-model、demo-16GB、context 2048、fixed prompt、max_tokens 128、max_num_seqs 16、gpu_memory_utilization 0.8）\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 `latency-0:metrics` 和 `latency-0:comparison` 明确列出了 baseline 和 current 的配置，除 concurrency 外其他参数完全一致。\"\n    },\n    {\n      \"quote\": \"TTFT P95 由0.4s升至3.0s(+2.6s)，E2E P95 由2.0s升至7.0s(+5.0s)，而吞吐仅4.0→4.2 req/s(+5%)\",\n      \"verdict\": \"supported\",\n      \"reason\": \"数据直接来自 `latency-0:metrics` 中的 baseline/current 指标及 `latency-0:comparison` 的 deltas。\"\n    },\n    {\n      \"quote\": \"成功率与显存峰值(9000MiB)均无变化\",\n      \"verdict\": \"supported\",\n      \"reason\": \"`latency-0:metrics` 显示 success_rate 均为 1.0，gpu_memory_peak_mib 均为 9000.0；`latency-0:comparison` 显示对应 delta 为 0.0。\"\n    },\n    {\n      \"quote\": \"日志出现 scheduler queue waiting requests=28，与 max_num_seqs=16 一致，表明约一半请求在队列等待\",\n      \"verdict\": \"hypothesis\",\n      \"reason\": \"日志确实存在 (`latency-0:logs`)，但“与 max_num_seqs=16 一致”这一推断缺乏直接证据支持。通常 waiting > max_num_seqs 意味着饱和，但具体数值关系（如是否恰好是一半或特定比例）需更多上下文或时间序列数据佐证，且单条日志不足以确证稳态行为。\"\n    },\n    {\n      \"quote\": \"非OOM/抢占（无相关日志、显存未变）\",\n      \"verdict\": \"unsupported\",\n      \"reason\": \"虽然显存未变且无 OOM 日志，但这不能排除 KV cache 不足导致的抢占（preemption）。文档 `doc-preemption` 指出抢占可能不伴随显存峰值显著变化或特定 OOM 错误，且当前证据中缺少 preemption/recompute 计数日志，无法确证“非抢占”。\"\n    },\n    {\n      \"quote\": \"指标标记为 synthetic，replay 未启动真实服务，故为相关性观察而非因果定论\",\n      \"verdict\": \"supported\",\n      \"reason\": \"`latency-0:metrics` 中 `synthetic: true`，`latency-0:replay` 中 note 说明“没有启动推理服务...”，结论正确反映了数据的局限性。\"\n    }\n  ],\n  \"tool_selection\": \"appropriate\",\n  \"parameter_semantics\": \"correct\",\n  \"citation_support\": \"partial\"\n}"
+    }
+  },
+  {
+    "file": "single-normal-0.json",
+    "valid": true,
+    "judgment": {
+      "claims": [
+        {
+          "quote": "日志为空且无错误计数",
+          "verdict": "supported",
+          "reason": "证据 normal-0:logs 显示 logs 数组为空，counts 对象为空。"
+        },
+        {
+          "quote": "当前运行与基线在 TTFT p95(0.4s)、E2E p95(2.0s)、吞吐(4.0/s)、成功率(1.0)、显存峰值(9000MiB)上完全一致",
+          "verdict": "supported",
+          "reason": "证据 normal-0:metrics 中 baseline 和 current 的各项指标数值完全相同。"
+        },
+        {
+          "quote": "所有 delta 为 0",
+          "verdict": "supported",
+          "reason": "证据 normal-0:comparison 中 deltas 的所有字段值均为 0.0。"
+        },
+        {
+          "quote": "配置无变更且判定可比",
+          "verdict": "supported",
+          "reason": "证据 normal-0:comparison 显示 changed_conditions 为空，comparable 为 true；normal-0:metrics 显示 config 一致。"
+        },
+        {
+          "quote": "离线规则重放亦无异常观察",
+          "verdict": "supported",
+          "reason": "证据 normal-0:replay 显示 observations 为空数组。"
+        },
+        {
+          "quote": "本次推理实验未发现异常",
+          "verdict": "hypothesis",
+          "reason": "虽然现有数据（synthetic metrics, empty logs）支持“无异常”的结论，但证据明确标记为 synthetic 且缺少真实运行时日志佐证，因此这更像是一个基于有限数据的假设而非确凿事实。"
+        }
+      ],
+      "tool_selection": "appropriate",
+      "parameter_semantics": "correct",
+      "citation_support": "supported"
+    },
+    "usage": [
+      {
+        "prompt_tokens": 1313,
+        "completion_tokens": 444,
+        "estimated_cny": 0.0022492000000000002,
+        "duration_ms": 6163.827899999887,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "{\n \"claims\": [\n  {\n   \"quote\": \"日志为空且无错误计数\",\n   \"verdict\": \"supported\",\n   \"reason\": \"证据 normal-0:logs 显示 logs 数组为空，counts 对象为空。\"\n  },\n  {\n   \"quote\": \"当前运行与基线在 TTFT p95(0.4s)、E2E p95(2.0s)、吞吐(4.0/s)、成功率(1.0)、显存峰值(9000MiB)上完全一致\",\n   \"verdict\": \"supported\",\n   \"reason\": \"证据 normal-0:metrics 中 baseline 和 current 的各项指标数值完全相同。\"\n  },\n  {\n   \"quote\": \"所有 delta 为 0\",\n   \"verdict\": \"supported\",\n   \"reason\": \"证据 normal-0:comparison 中 deltas 的所有字段值均为 0.0。\"\n  },\n  {\n   \"quote\": \"配置无变更且判定可比\",\n   \"verdict\": \"supported\",\n   \"reason\": \"证据 normal-0:comparison 显示 changed_conditions 为空，comparable 为 true；normal-0:metrics 显示 config 一致。\"\n  },\n  {\n   \"quote\": \"离线规则重放亦无异常观察\",\n   \"verdict\": \"supported\",\n   \"reason\": \"证据 normal-0:replay 显示 observations 为空数组。\"\n  },\n  {\n   \"quote\": \"本次推理实验未发现异常\",\n   \"verdict\": \"hypothesis\",\n   \"reason\": \"虽然现有数据（synthetic metrics, empty logs）支持“无异常”的结论，但证据明确标记为 synthetic 且缺少真实运行时日志佐证，因此这更像是一个基于有限数据的假设而非确凿事实。\"\n  }\n ],\n \"tool_selection\": \"appropriate\",\n \"parameter_semantics\": \"correct\",\n \"citation_support\": \"supported\"\n}"
+    }
+  },
+  {
+    "file": "single-oom-0.json",
+    "valid": false,
+    "error": "judge_schema_or_quote_error",
+    "usage": [
+      {
+        "prompt_tokens": 1890,
+        "completion_tokens": 632,
+        "estimated_cny": 0.0032184,
+        "duration_ms": 10015.521799999988,
+        "attempt": 1
+      }
+    ],
+    "raw_response": {
+      "role": "assistant",
+      "content": "{\n  \"claims\": [\n    {\n      \"quote\": \"日志确认 CUDA out of memory 分配失败\",\n      \"verdict\": \"supported\",\n      \"reason\": \"证据 oom-0:logs 中包含明确的 ERROR 级别日志 'CUDA out of memory: allocation failed'。\"\n    },\n    {\n      \"quote\": \"基线与当前在模型、设备、上下文2048、并发4、max_tokens128及配置(max_num_seqs=16, gpu_memory_utilization=0.8)完全一致\",\n      \"verdict\": \"supported\",\n      \"reason\": \"对比 oom-0:metrics 中的 baseline 和 current 数据，所有列出的参数（model, device, context_size, concurrency, max_tokens, config）数值均相同。\"\n    },\n    {\n      \"quote\": \"显存峰值由9000升至15800 MiB(+6800)\",\n      \"verdict\": \"supported\",\n      \"reason\": \"oom-0:metrics 显示 baseline gpu_memory_peak_mib 为 9000.0，current 为 15800.0；oom-0:comparison 的 deltas 中 gpu_memory_peak_mib 为 6800.0。\"\n    },\n    {\n      \"quote\": \"成功率降至0.65(-0.35)，而TTFT/E2E/吞吐无变化\",\n      \"verdict\": \"supported\",\n      \"reason\": \"oom-0:metrics 显示 success_rate 从 1.0 降至 0.65；oom-0:comparison 显示 ttft_p95_seconds, e2e_p95_seconds, request_throughput_per_second 的 delta 均为 0.0。\"\n    },\n    {\n      \"quote\": \"离线重放仅规则命中OOM，未产生新硬件测量\",\n      \"verdict\": \"supported\",\n      \"reason\": \"oom-0:replay 证据显示 mode 为 'offline_rule_replay'，observations 包含 'oom'，且 note 明确说明 '没有启动推理服务，也没有生成新的硬件测量数据'。\"\n    },\n    {\n      \"quote\": \"根因为候选：配置不变下出现预算外显存增长...亦不排除输入分布隐性变化\",\n      \"verdict\": \"hypothesis\",\n      \"reason\": \"结论中明确标注这些为“候选”原因，并指出“因果未经控制变量复测确认”。虽然配置一致但显存激增是事实，具体导致该现象的根本原因（如碎片、其他进程、输入变化等）缺乏直接证据支持，属于基于现象的合理推测。\"\n    }\n  ],\n  \"tool_selection\": \"appropriate\",\n  \"parameter_semantics\": \"correct\",\n  \"citation_support\": \"supported\"\n}"
+    }
+  }
+]

@@ -1,0 +1,52 @@
+services:
+  app:
+    build: .
+    env_file: backend/.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://diagnosis:diagnosis@postgres:5432/diagnosis
+      REDIS_URL: redis://redis:6379/0
+      RUNTIME_DIR: /app/runtime
+    ports:
+      - "127.0.0.1:18080:8000"
+    volumes:
+      - diagnosis_runtime:/app/runtime
+      - ./evaluation-results:/app/evaluation-results:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: diagnosis
+      POSTGRES_USER: diagnosis
+      POSTGRES_PASSWORD: diagnosis
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - diagnosis_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U diagnosis -d diagnosis"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:56379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  diagnosis_postgres:
+  diagnosis_runtime:

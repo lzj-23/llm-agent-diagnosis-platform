@@ -1,0 +1,973 @@
+{
+  "status": "completed",
+  "diagnosis": {
+    "category": "oom",
+    "conclusion": "服务出现 CUDA OOM，当前显存峰值 (15800 MiB) 较基线 (9000 MiB) 激增 6800 MiB，导致成功率降至 65%。配置参数（max_num_seqs, gpu_memory_utilization）与基线一致且无变更条件记录，排除人为配置错误。延迟指标正常，表明问题非排队引起，而是显存资源耗尽。候选根因包括：1. KV Cache 碎片化或预分配策略失效；2. 突发长序列/大 Batch 请求超出预期内存占用；3. 其他进程干扰或显存泄漏。需进一步排查运行时负载细节及系统级显存占用。",
+    "evidence_ids": [
+      "oom-0:logs",
+      "oom-0:metrics",
+      "oom-0:comparison"
+    ],
+    "recommendations": [
+      "检查报错时刻同机其他进程的显存占用情况，排除外部干扰。",
+      "分析 OOM 前请求的 input_tokens 分布，确认是否存在超长上下文离群值。",
+      "审查 PyTorch/CUDA 内存分配器日志，判断是否存在严重碎片化。",
+      "尝试降低 max_num_seqs 或限制最大输入长度进行控制变量复测，验证是否为并发/长度导致的瞬时溢出。"
+    ],
+    "verification": [
+      "使用 nvidia-smi 监控实时显存占用，确认是否有非推理进程占用。",
+      "提取并统计失败请求的元数据（Token 数、Batch Size），对比成功请求。",
+      "在相同硬件环境下，固定模型和输入，逐步增加并发或序列长度，观察显存增长曲线是否复现异常峰值。"
+    ],
+    "uncertainty": "缺乏具体的请求级元数据（如单条请求的 Token 长度）和系统级进程监控数据，无法确切区分是内部碎片化、特定大请求触发还是外部进程抢占导致的显存激增。"
+  },
+  "report": {
+    "case_id": "oom-0",
+    "conclusion": "服务出现 CUDA OOM，当前显存峰值 (15800 MiB) 较基线 (9000 MiB) 激增 6800 MiB，导致成功率降至 65%。配置参数（max_num_seqs, gpu_memory_utilization）与基线一致且无变更条件记录，排除人为配置错误。延迟指标正常，表明问题非排队引起，而是显存资源耗尽。候选根因包括：1. KV Cache 碎片化或预分配策略失效；2. 突发长序列/大 Batch 请求超出预期内存占用；3. 其他进程干扰或显存泄漏。需进一步排查运行时负载细节及系统级显存占用。",
+    "evidence_ids": [
+      "oom-0:logs",
+      "oom-0:metrics",
+      "oom-0:comparison"
+    ],
+    "recommendations": [
+      "检查报错时刻同机其他进程的显存占用情况，排除外部干扰。",
+      "分析 OOM 前请求的 input_tokens 分布，确认是否存在超长上下文离群值。",
+      "审查 PyTorch/CUDA 内存分配器日志，判断是否存在严重碎片化。",
+      "尝试降低 max_num_seqs 或限制最大输入长度进行控制变量复测，验证是否为并发/长度导致的瞬时溢出。"
+    ],
+    "synthetic": true,
+    "status": "candidate_diagnosis"
+  },
+  "evidence": {
+    "oom-0:logs": {
+      "evidence_id": "oom-0:logs",
+      "logs": [
+        {
+          "timestamp": "2026-01-01T00:00:01Z",
+          "level": "ERROR",
+          "message": "CUDA out of memory: allocation failed"
+        }
+      ],
+      "counts": {
+        "ERROR": 1
+      }
+    },
+    "oom-0:metrics": {
+      "evidence_id": "oom-0:metrics",
+      "synthetic": true,
+      "baseline": {
+        "id": "baseline",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 2048,
+        "concurrency": 4,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 0.4,
+          "e2e_p95_seconds": 2.0,
+          "request_throughput_per_second": 4.0,
+          "success_rate": 1.0,
+          "gpu_memory_peak_mib": 9000.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8
+        }
+      },
+      "current": {
+        "id": "current",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 2048,
+        "concurrency": 4,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 0.4,
+          "e2e_p95_seconds": 2.0,
+          "request_throughput_per_second": 4.0,
+          "success_rate": 0.65,
+          "gpu_memory_peak_mib": 15800.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8
+        }
+      }
+    },
+    "oom-0:comparison": {
+      "evidence_id": "oom-0:comparison",
+      "changed_conditions": {},
+      "deltas": {
+        "ttft_p95_seconds": 0.0,
+        "e2e_p95_seconds": 0.0,
+        "request_throughput_per_second": 0.0,
+        "success_rate": -0.35,
+        "gpu_memory_peak_mib": 6800.0
+      },
+      "comparable": true,
+      "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+    },
+    "oom-0:replay": {
+      "evidence_id": "oom-0:replay",
+      "mode": "offline_rule_replay",
+      "observations": [
+        "oom"
+      ],
+      "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+    },
+    "doc-memory": {
+      "id": "doc-memory",
+      "title": "显存故障排查笔记",
+      "url": "local://runbooks/memory",
+      "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+      "score": 1.6591
+    },
+    "doc-preemption": {
+      "id": "doc-preemption",
+      "title": "vLLM KV cache 与抢占",
+      "url": "https://docs.vllm.ai/en/v0.12.0/configuration/optimization/",
+      "text": "KV cache 不足可导致抢占和重计算。检查 preemption、并发与显存分配。在资源允许时评估 gpu_memory_utilization 或 tensor_parallel_size，也可减少 max_num_seqs 或 max_num_batched_tokens，须实测延迟吞吐权衡。",
+      "score": 0.9526
+    },
+    "doc-latency": {
+      "id": "doc-latency",
+      "title": "延迟与排队排查笔记",
+      "url": "local://runbooks/latency",
+      "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+      "score": 0.3638
+    }
+  },
+  "events": [
+    {
+      "seq": 1,
+      "role": "system",
+      "action": "running",
+      "mode": "multi"
+    },
+    {
+      "seq": 2,
+      "role": "planner",
+      "action": "plan",
+      "output": "针对 case_id=oom-0 的 CUDA OOM 排查，制定以下4步计划：\n\n1. **确认OOM发生时的显存快照与日志上下文**\n   - **动作**：获取报错时间点前后的服务日志（含堆栈）及监控中的 GPU 显存使用率曲线。\n   - **证据需求**：明确的 `CUDA out of memory` 错误时间戳；该时刻 GPU 总显存、已用显存数值；是否伴随其他异常（如进程重启）。\n\n2. **分析请求负载特征（Batch Size/序列长度）**\n   - **动作**：提取报错前最近 N 个成功/失败请求的元数据（输入 token 数、batch size、并发量）。\n   - **证据需求**：是否存在突发的大 batch 或超长序列请求；正常流量下的峰值显存占用基线对比。\n\n3. **检查模型配置与内存碎片化情况**\n   - **动作**：审查当前推理引擎配置（如 KV Cache 预分配比例、max_num_seqs、量化设置）及 PyTorch/CUDA 内存分配器状态。\n   - **证据需求**：配置文件参数值；是否有 `PYTORCH_CUDA_ALLOC_CONF` 相关设置；日志中是否出现大量小对象分配导致的碎片化迹象（若可获取）。\n\n4. **复现或隔离测试（可选但推荐）**\n   - **动作**：在相同硬件环境下，使用典型大请求进行压测，观察显存增长趋势。\n   - **证据需求**：压测过程中显存随请求累积的变化曲线；是否在特定请求组合下触发 OOM，以排除偶发性泄漏或配置不足。"
+    },
+    {
+      "seq": 3,
+      "role": "system",
+      "action": "mcp_connected",
+      "tools": [
+        "query_logs",
+        "query_metrics",
+        "compare_runs",
+        "replay_case",
+        "search_docs",
+        "generate_report"
+      ]
+    },
+    {
+      "seq": 4,
+      "role": "executor",
+      "action": "tool",
+      "tool": "query_logs",
+      "arguments": {
+        "case_id": "oom-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "oom-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "CUDA out of memory: allocation failed"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.7626000012096483,
+      "evidence": {
+        "oom-0:logs": {
+          "evidence_id": "oom-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "CUDA out of memory: allocation failed"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "oom-0:metrics": {
+          "evidence_id": "oom-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.65,
+              "gpu_memory_peak_mib": 15800.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "oom-0:comparison": {
+          "evidence_id": "oom-0:comparison",
+          "changed_conditions": {},
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.35,
+            "gpu_memory_peak_mib": 6800.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "oom-0:replay": {
+          "evidence_id": "oom-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [
+            "oom"
+          ],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        },
+        "doc-memory": {
+          "id": "doc-memory",
+          "title": "显存故障排查笔记",
+          "url": "local://runbooks/memory",
+          "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+          "score": 1.6591
+        },
+        "doc-preemption": {
+          "id": "doc-preemption",
+          "title": "vLLM KV cache 与抢占",
+          "url": "https://docs.vllm.ai/en/v0.12.0/configuration/optimization/",
+          "text": "KV cache 不足可导致抢占和重计算。检查 preemption、并发与显存分配。在资源允许时评估 gpu_memory_utilization 或 tensor_parallel_size，也可减少 max_num_seqs 或 max_num_batched_tokens，须实测延迟吞吐权衡。",
+          "score": 0.9526
+        },
+        "doc-latency": {
+          "id": "doc-latency",
+          "title": "延迟与排队排查笔记",
+          "url": "local://runbooks/latency",
+          "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+          "score": 0.3638
+        }
+      }
+    },
+    {
+      "seq": 5,
+      "role": "executor",
+      "action": "tool",
+      "tool": "query_metrics",
+      "arguments": {
+        "case_id": "oom-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "oom-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.65,
+              "gpu_memory_peak_mib": 15800.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.228300000046147,
+      "evidence": {
+        "oom-0:logs": {
+          "evidence_id": "oom-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "CUDA out of memory: allocation failed"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "oom-0:metrics": {
+          "evidence_id": "oom-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.65,
+              "gpu_memory_peak_mib": 15800.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "oom-0:comparison": {
+          "evidence_id": "oom-0:comparison",
+          "changed_conditions": {},
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.35,
+            "gpu_memory_peak_mib": 6800.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "oom-0:replay": {
+          "evidence_id": "oom-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [
+            "oom"
+          ],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        },
+        "doc-memory": {
+          "id": "doc-memory",
+          "title": "显存故障排查笔记",
+          "url": "local://runbooks/memory",
+          "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+          "score": 1.6591
+        },
+        "doc-preemption": {
+          "id": "doc-preemption",
+          "title": "vLLM KV cache 与抢占",
+          "url": "https://docs.vllm.ai/en/v0.12.0/configuration/optimization/",
+          "text": "KV cache 不足可导致抢占和重计算。检查 preemption、并发与显存分配。在资源允许时评估 gpu_memory_utilization 或 tensor_parallel_size，也可减少 max_num_seqs 或 max_num_batched_tokens，须实测延迟吞吐权衡。",
+          "score": 0.9526
+        },
+        "doc-latency": {
+          "id": "doc-latency",
+          "title": "延迟与排队排查笔记",
+          "url": "local://runbooks/latency",
+          "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+          "score": 0.3638
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "role": "executor",
+      "action": "tool",
+      "tool": "compare_runs",
+      "arguments": {
+        "case_id": "oom-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "oom-0:comparison",
+          "changed_conditions": {},
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.35,
+            "gpu_memory_peak_mib": 6800.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 2.945000000181608,
+      "evidence": {
+        "oom-0:logs": {
+          "evidence_id": "oom-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "CUDA out of memory: allocation failed"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "oom-0:metrics": {
+          "evidence_id": "oom-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.65,
+              "gpu_memory_peak_mib": 15800.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "oom-0:comparison": {
+          "evidence_id": "oom-0:comparison",
+          "changed_conditions": {},
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.35,
+            "gpu_memory_peak_mib": 6800.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "oom-0:replay": {
+          "evidence_id": "oom-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [
+            "oom"
+          ],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        },
+        "doc-memory": {
+          "id": "doc-memory",
+          "title": "显存故障排查笔记",
+          "url": "local://runbooks/memory",
+          "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+          "score": 1.6591
+        },
+        "doc-preemption": {
+          "id": "doc-preemption",
+          "title": "vLLM KV cache 与抢占",
+          "url": "https://docs.vllm.ai/en/v0.12.0/configuration/optimization/",
+          "text": "KV cache 不足可导致抢占和重计算。检查 preemption、并发与显存分配。在资源允许时评估 gpu_memory_utilization 或 tensor_parallel_size，也可减少 max_num_seqs 或 max_num_batched_tokens，须实测延迟吞吐权衡。",
+          "score": 0.9526
+        },
+        "doc-latency": {
+          "id": "doc-latency",
+          "title": "延迟与排队排查笔记",
+          "url": "local://runbooks/latency",
+          "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+          "score": 0.3638
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "role": "executor",
+      "action": "tool",
+      "tool": "replay_case",
+      "arguments": {
+        "case_id": "oom-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "oom-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [
+            "oom"
+          ],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.0235999984142836,
+      "evidence": {
+        "oom-0:logs": {
+          "evidence_id": "oom-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "CUDA out of memory: allocation failed"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "oom-0:metrics": {
+          "evidence_id": "oom-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.65,
+              "gpu_memory_peak_mib": 15800.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "oom-0:comparison": {
+          "evidence_id": "oom-0:comparison",
+          "changed_conditions": {},
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.35,
+            "gpu_memory_peak_mib": 6800.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "oom-0:replay": {
+          "evidence_id": "oom-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [
+            "oom"
+          ],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        },
+        "doc-memory": {
+          "id": "doc-memory",
+          "title": "显存故障排查笔记",
+          "url": "local://runbooks/memory",
+          "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+          "score": 1.6591
+        },
+        "doc-preemption": {
+          "id": "doc-preemption",
+          "title": "vLLM KV cache 与抢占",
+          "url": "https://docs.vllm.ai/en/v0.12.0/configuration/optimization/",
+          "text": "KV cache 不足可导致抢占和重计算。检查 preemption、并发与显存分配。在资源允许时评估 gpu_memory_utilization 或 tensor_parallel_size，也可减少 max_num_seqs 或 max_num_batched_tokens，须实测延迟吞吐权衡。",
+          "score": 0.9526
+        },
+        "doc-latency": {
+          "id": "doc-latency",
+          "title": "延迟与排队排查笔记",
+          "url": "local://runbooks/latency",
+          "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+          "score": 0.3638
+        }
+      }
+    },
+    {
+      "seq": 8,
+      "role": "executor",
+      "action": "tool",
+      "tool": "search_docs",
+      "arguments": {
+        "query": "CUDA out of memory 显存峰值异常 gpu_memory_utilization max_num_seqs KV cache 排查",
+        "top_k": 3
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "query": "CUDA out of memory 显存峰值异常 gpu_memory_utilization max_num_seqs KV cache 排查",
+          "rewritten_query": "CUDA out of memory 显存峰值异常 gpu_memory_utilization max_num_seqs KV cache 排查 OOM memory",
+          "backend": "lexical_baseline",
+          "hits": [
+            {
+              "id": "doc-memory",
+              "title": "显存故障排查笔记",
+              "url": "local://runbooks/memory",
+              "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+              "score": 1.6591
+            },
+            {
+              "id": "doc-preemption",
+              "title": "vLLM KV cache 与抢占",
+              "url": "https://docs.vllm.ai/en/v0.12.0/configuration/optimization/",
+              "text": "KV cache 不足可导致抢占和重计算。检查 preemption、并发与显存分配。在资源允许时评估 gpu_memory_utilization 或 tensor_parallel_size，也可减少 max_num_seqs 或 max_num_batched_tokens，须实测延迟吞吐权衡。",
+              "score": 0.9526
+            },
+            {
+              "id": "doc-latency",
+              "title": "延迟与排队排查笔记",
+              "url": "local://runbooks/latency",
+              "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+              "score": 0.3638
+            }
+          ],
+          "empty": false
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 4.675000000133878,
+      "evidence": {
+        "oom-0:logs": {
+          "evidence_id": "oom-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "CUDA out of memory: allocation failed"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "oom-0:metrics": {
+          "evidence_id": "oom-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.65,
+              "gpu_memory_peak_mib": 15800.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "oom-0:comparison": {
+          "evidence_id": "oom-0:comparison",
+          "changed_conditions": {},
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.35,
+            "gpu_memory_peak_mib": 6800.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "oom-0:replay": {
+          "evidence_id": "oom-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [
+            "oom"
+          ],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        },
+        "doc-memory": {
+          "id": "doc-memory",
+          "title": "显存故障排查笔记",
+          "url": "local://runbooks/memory",
+          "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+          "score": 1.6591
+        },
+        "doc-preemption": {
+          "id": "doc-preemption",
+          "title": "vLLM KV cache 与抢占",
+          "url": "https://docs.vllm.ai/en/v0.12.0/configuration/optimization/",
+          "text": "KV cache 不足可导致抢占和重计算。检查 preemption、并发与显存分配。在资源允许时评估 gpu_memory_utilization 或 tensor_parallel_size，也可减少 max_num_seqs 或 max_num_batched_tokens，须实测延迟吞吐权衡。",
+          "score": 0.9526
+        },
+        "doc-latency": {
+          "id": "doc-latency",
+          "title": "延迟与排队排查笔记",
+          "url": "local://runbooks/latency",
+          "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+          "score": 0.3638
+        }
+      }
+    },
+    {
+      "seq": 9,
+      "role": "executor",
+      "action": "draft",
+      "output": {
+        "category": "oom",
+        "conclusion": "服务出现 CUDA OOM，当前显存峰值 (15800 MiB) 较基线 (9000 MiB) 激增 6800 MiB，导致成功率降至 65%。配置参数（max_num_seqs, gpu_memory_utilization）与基线一致且无变更条件记录，排除人为配置错误。延迟指标正常，表明问题非排队引起，而是显存资源耗尽。候选根因包括：1. KV Cache 碎片化或预分配策略失效；2. 突发长序列/大 Batch 请求超出预期内存占用；3. 其他进程干扰或显存泄漏。需进一步排查运行时负载细节及系统级显存占用。",
+        "evidence_ids": [
+          "oom-0:logs",
+          "oom-0:metrics",
+          "oom-0:comparison"
+        ],
+        "recommendations": [
+          "检查报错时刻同机其他进程的显存占用情况，排除外部干扰。",
+          "分析 OOM 前请求的 input_tokens 分布，确认是否存在超长上下文离群值。",
+          "审查 PyTorch/CUDA 内存分配器日志，判断是否存在严重碎片化。",
+          "尝试降低 max_num_seqs 或限制最大输入长度进行控制变量复测，验证是否为并发/长度导致的瞬时溢出。"
+        ],
+        "verification": [
+          "使用 nvidia-smi 监控实时显存占用，确认是否有非推理进程占用。",
+          "提取并统计失败请求的元数据（Token 数、Batch Size），对比成功请求。",
+          "在相同硬件环境下，固定模型和输入，逐步增加并发或序列长度，观察显存增长曲线是否复现异常峰值。"
+        ],
+        "uncertainty": "缺乏具体的请求级元数据（如单条请求的 Token 长度）和系统级进程监控数据，无法确切区分是内部碎片化、特定大请求触发还是外部进程抢占导致的显存激增。"
+      }
+    },
+    {
+      "seq": 10,
+      "role": "reviewer",
+      "action": "review",
+      "output": {
+        "category": "oom",
+        "conclusion": "服务出现 CUDA OOM，当前显存峰值 (15800 MiB) 较基线 (9000 MiB) 激增 6800 MiB，导致成功率降至 65%。配置参数（max_num_seqs, gpu_memory_utilization）与基线一致且无变更条件记录，排除人为配置错误。延迟指标正常，表明问题非排队引起，而是显存资源耗尽。候选根因包括：1. KV Cache 碎片化或预分配策略失效；2. 突发长序列/大 Batch 请求超出预期内存占用；3. 其他进程干扰或显存泄漏。需进一步排查运行时负载细节及系统级显存占用。",
+        "evidence_ids": [
+          "oom-0:logs",
+          "oom-0:metrics",
+          "oom-0:comparison"
+        ],
+        "recommendations": [
+          "检查报错时刻同机其他进程的显存占用情况，排除外部干扰。",
+          "分析 OOM 前请求的 input_tokens 分布，确认是否存在超长上下文离群值。",
+          "审查 PyTorch/CUDA 内存分配器日志，判断是否存在严重碎片化。",
+          "尝试降低 max_num_seqs 或限制最大输入长度进行控制变量复测，验证是否为并发/长度导致的瞬时溢出。"
+        ],
+        "verification": [
+          "使用 nvidia-smi 监控实时显存占用，确认是否有非推理进程占用。",
+          "提取并统计失败请求的元数据（Token 数、Batch Size），对比成功请求。",
+          "在相同硬件环境下，固定模型和输入，逐步增加并发或序列长度，观察显存增长曲线是否复现异常峰值。"
+        ],
+        "uncertainty": "缺乏具体的请求级元数据（如单条请求的 Token 长度）和系统级进程监控数据，无法确切区分是内部碎片化、特定大请求触发还是外部进程抢占导致的显存激增。"
+      }
+    },
+    {
+      "seq": 11,
+      "role": "system",
+      "action": "completed"
+    }
+  ],
+  "tools": [
+    "query_logs",
+    "query_metrics",
+    "compare_runs",
+    "replay_case",
+    "search_docs"
+  ],
+  "usage": [
+    {
+      "prompt_tokens": 157,
+      "completion_tokens": 357,
+      "estimated_cny": 0.0010895,
+      "duration_ms": 6587.923000002775,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1260,
+      "completion_tokens": 103,
+      "estimated_cny": 0.0012860999999999999,
+      "duration_ms": 2182.415700001002,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1748,
+      "completion_tokens": 44,
+      "estimated_cny": 0.0015172,
+      "duration_ms": 1707.299999998213,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1863,
+      "completion_tokens": 55,
+      "estimated_cny": 0.0016389,
+      "duration_ms": 1870.6922000019404,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 2283,
+      "completion_tokens": 859,
+      "estimated_cny": 0.0041457,
+      "duration_ms": 13080.132200000662,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 3535,
+      "completion_tokens": 453,
+      "estimated_cny": 0.0040511,
+      "duration_ms": 7452.994100000069,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1682,
+      "completion_tokens": 453,
+      "estimated_cny": 0.0025687,
+      "duration_ms": 6999.5402000022295,
+      "attempt": 1
+    }
+  ],
+  "duration_ms": 40785.39660000024
+}

@@ -1,0 +1,1040 @@
+{
+  "status": "completed",
+  "diagnosis": {
+    "category": "config",
+    "conclusion": "根因候选：服务侧 max_model_len=2048 与提升后的输入上下文 32768 不一致，超限请求被拒绝。日志明确报错 input length 32768 exceeds max_model_len 2048；指标显示成功率由 1.0 降至 0.5（Δ-0.5），而 TTFT/E2E P95、吞吐、显存峰值均无变化，排除 OOM 与排队/饱和。comparison 判定 comparable=true，唯一相关变更为 context_size 2048→32768 且新增 max_model_len=2048。本次为离线规则重放，未启动推理服务、未产生新硬件测量数据。",
+    "evidence_ids": [
+      "config-0:logs",
+      "config-0:metrics",
+      "config-0:comparison",
+      "config-0:replay",
+      "doc-config"
+    ],
+    "recommendations": [
+      "将服务 max_model_len 提升至 ≥ 目标上下文（如 32768）或按模型实际支持上限设定",
+      "若受显存限制无法放大，则回退输入长度至 ≤2048",
+      "调整后重跑并核对成功率恢复及长上下文 KV cache 带来的显存峰值上升"
+    ],
+    "verification": [
+      "控制变量复测：仅修改 max_model_len，保持模型/设备/并发/输入不变，确认成功率回升",
+      "监控 gpu_memory_peak_mib 是否随上下文增大而上升，验证非资源瓶颈假设"
+    ],
+    "uncertainty": "配置变更与失败仅为相关性证据，因果需控制变量复测确认；当前为离线重放，无新硬件测量数据。"
+  },
+  "report": {
+    "case_id": "config-0",
+    "conclusion": "根因候选：服务侧 max_model_len=2048 与提升后的输入上下文 32768 不一致，超限请求被拒绝。日志明确报错 input length 32768 exceeds max_model_len 2048；指标显示成功率由 1.0 降至 0.5（Δ-0.5），而 TTFT/E2E P95、吞吐、显存峰值均无变化，排除 OOM 与排队/饱和。comparison 判定 comparable=true，唯一相关变更为 context_size 2048→32768 且新增 max_model_len=2048。本次为离线规则重放，未启动推理服务、未产生新硬件测量数据。",
+    "evidence_ids": [
+      "config-0:logs",
+      "config-0:metrics",
+      "config-0:comparison",
+      "config-0:replay",
+      "doc-config"
+    ],
+    "recommendations": [
+      "将服务 max_model_len 提升至 ≥ 目标上下文（如 32768）或按模型实际支持上限设定",
+      "若受显存限制无法放大，则回退输入长度至 ≤2048",
+      "调整后重跑并核对成功率恢复及长上下文 KV cache 带来的显存峰值上升"
+    ],
+    "synthetic": true,
+    "status": "candidate_diagnosis"
+  },
+  "evidence": {
+    "config-0:logs": {
+      "evidence_id": "config-0:logs",
+      "logs": [
+        {
+          "timestamp": "2026-01-01T00:00:01Z",
+          "level": "ERROR",
+          "message": "input length 32768 exceeds max_model_len 2048"
+        }
+      ],
+      "counts": {
+        "ERROR": 1
+      }
+    },
+    "config-0:metrics": {
+      "evidence_id": "config-0:metrics",
+      "synthetic": true,
+      "baseline": {
+        "id": "baseline",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 2048,
+        "concurrency": 4,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 0.4,
+          "e2e_p95_seconds": 2.0,
+          "request_throughput_per_second": 4.0,
+          "success_rate": 1.0,
+          "gpu_memory_peak_mib": 9000.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8
+        }
+      },
+      "current": {
+        "id": "current",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 32768,
+        "concurrency": 4,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 0.4,
+          "e2e_p95_seconds": 2.0,
+          "request_throughput_per_second": 4.0,
+          "success_rate": 0.5,
+          "gpu_memory_peak_mib": 9000.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8,
+          "max_model_len": 2048
+        }
+      }
+    },
+    "config-0:comparison": {
+      "evidence_id": "config-0:comparison",
+      "changed_conditions": {
+        "context_size": {
+          "before": 2048,
+          "after": 32768
+        },
+        "config": {
+          "before": {
+            "max_num_seqs": 16,
+            "gpu_memory_utilization": 0.8
+          },
+          "after": {
+            "max_num_seqs": 16,
+            "gpu_memory_utilization": 0.8,
+            "max_model_len": 2048
+          }
+        }
+      },
+      "deltas": {
+        "ttft_p95_seconds": 0.0,
+        "e2e_p95_seconds": 0.0,
+        "request_throughput_per_second": 0.0,
+        "success_rate": -0.5,
+        "gpu_memory_peak_mib": 0.0
+      },
+      "comparable": true,
+      "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+    },
+    "config-0:replay": {
+      "evidence_id": "config-0:replay",
+      "mode": "offline_rule_replay",
+      "observations": [
+        "config"
+      ],
+      "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+    },
+    "doc-config": {
+      "id": "doc-config",
+      "title": "配置与输入长度排查笔记",
+      "url": "local://runbooks/config",
+      "text": "max_model_len context input length 配置 上下文。输入长度超过配置上限会请求失败。先核对实际输入、模型支持长度和服务上限，再调整输入长度，验证成功率与内存开销。",
+      "score": 2.4623
+    },
+    "doc-memory": {
+      "id": "doc-memory",
+      "title": "显存故障排查笔记",
+      "url": "local://runbooks/memory",
+      "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+      "score": 0.5185
+    },
+    "doc-latency": {
+      "id": "doc-latency",
+      "title": "延迟与排队排查笔记",
+      "url": "local://runbooks/latency",
+      "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+      "score": 0.3638
+    }
+  },
+  "events": [
+    {
+      "seq": 1,
+      "role": "system",
+      "action": "running",
+      "mode": "single"
+    },
+    {
+      "seq": 2,
+      "role": "system",
+      "action": "mcp_connected",
+      "tools": [
+        "query_logs",
+        "query_metrics",
+        "compare_runs",
+        "replay_case",
+        "search_docs",
+        "generate_report"
+      ]
+    },
+    {
+      "seq": 3,
+      "role": "executor",
+      "action": "tool",
+      "tool": "query_logs",
+      "arguments": {
+        "case_id": "config-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "config-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "input length 32768 exceeds max_model_len 2048"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.387500000826549,
+      "evidence": {
+        "config-0:logs": {
+          "evidence_id": "config-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "input length 32768 exceeds max_model_len 2048"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "config-0:metrics": {
+          "evidence_id": "config-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 32768,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.5,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8,
+              "max_model_len": 2048
+            }
+          }
+        },
+        "config-0:comparison": {
+          "evidence_id": "config-0:comparison",
+          "changed_conditions": {
+            "context_size": {
+              "before": 2048,
+              "after": 32768
+            },
+            "config": {
+              "before": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8
+              },
+              "after": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8,
+                "max_model_len": 2048
+              }
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.5,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "config-0:replay": {
+          "evidence_id": "config-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [
+            "config"
+          ],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        },
+        "doc-config": {
+          "id": "doc-config",
+          "title": "配置与输入长度排查笔记",
+          "url": "local://runbooks/config",
+          "text": "max_model_len context input length 配置 上下文。输入长度超过配置上限会请求失败。先核对实际输入、模型支持长度和服务上限，再调整输入长度，验证成功率与内存开销。",
+          "score": 2.4623
+        },
+        "doc-memory": {
+          "id": "doc-memory",
+          "title": "显存故障排查笔记",
+          "url": "local://runbooks/memory",
+          "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+          "score": 0.5185
+        },
+        "doc-latency": {
+          "id": "doc-latency",
+          "title": "延迟与排队排查笔记",
+          "url": "local://runbooks/latency",
+          "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+          "score": 0.3638
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "role": "executor",
+      "action": "tool",
+      "tool": "query_metrics",
+      "arguments": {
+        "case_id": "config-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "config-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 32768,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.5,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8,
+              "max_model_len": 2048
+            }
+          }
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 2.3311999975703657,
+      "evidence": {
+        "config-0:logs": {
+          "evidence_id": "config-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "input length 32768 exceeds max_model_len 2048"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "config-0:metrics": {
+          "evidence_id": "config-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 32768,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.5,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8,
+              "max_model_len": 2048
+            }
+          }
+        },
+        "config-0:comparison": {
+          "evidence_id": "config-0:comparison",
+          "changed_conditions": {
+            "context_size": {
+              "before": 2048,
+              "after": 32768
+            },
+            "config": {
+              "before": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8
+              },
+              "after": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8,
+                "max_model_len": 2048
+              }
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.5,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "config-0:replay": {
+          "evidence_id": "config-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [
+            "config"
+          ],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        },
+        "doc-config": {
+          "id": "doc-config",
+          "title": "配置与输入长度排查笔记",
+          "url": "local://runbooks/config",
+          "text": "max_model_len context input length 配置 上下文。输入长度超过配置上限会请求失败。先核对实际输入、模型支持长度和服务上限，再调整输入长度，验证成功率与内存开销。",
+          "score": 2.4623
+        },
+        "doc-memory": {
+          "id": "doc-memory",
+          "title": "显存故障排查笔记",
+          "url": "local://runbooks/memory",
+          "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+          "score": 0.5185
+        },
+        "doc-latency": {
+          "id": "doc-latency",
+          "title": "延迟与排队排查笔记",
+          "url": "local://runbooks/latency",
+          "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+          "score": 0.3638
+        }
+      }
+    },
+    {
+      "seq": 5,
+      "role": "executor",
+      "action": "tool",
+      "tool": "compare_runs",
+      "arguments": {
+        "case_id": "config-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "config-0:comparison",
+          "changed_conditions": {
+            "context_size": {
+              "before": 2048,
+              "after": 32768
+            },
+            "config": {
+              "before": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8
+              },
+              "after": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8,
+                "max_model_len": 2048
+              }
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.5,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 2.478900001733564,
+      "evidence": {
+        "config-0:logs": {
+          "evidence_id": "config-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "input length 32768 exceeds max_model_len 2048"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "config-0:metrics": {
+          "evidence_id": "config-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 32768,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.5,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8,
+              "max_model_len": 2048
+            }
+          }
+        },
+        "config-0:comparison": {
+          "evidence_id": "config-0:comparison",
+          "changed_conditions": {
+            "context_size": {
+              "before": 2048,
+              "after": 32768
+            },
+            "config": {
+              "before": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8
+              },
+              "after": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8,
+                "max_model_len": 2048
+              }
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.5,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "config-0:replay": {
+          "evidence_id": "config-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [
+            "config"
+          ],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        },
+        "doc-config": {
+          "id": "doc-config",
+          "title": "配置与输入长度排查笔记",
+          "url": "local://runbooks/config",
+          "text": "max_model_len context input length 配置 上下文。输入长度超过配置上限会请求失败。先核对实际输入、模型支持长度和服务上限，再调整输入长度，验证成功率与内存开销。",
+          "score": 2.4623
+        },
+        "doc-memory": {
+          "id": "doc-memory",
+          "title": "显存故障排查笔记",
+          "url": "local://runbooks/memory",
+          "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+          "score": 0.5185
+        },
+        "doc-latency": {
+          "id": "doc-latency",
+          "title": "延迟与排队排查笔记",
+          "url": "local://runbooks/latency",
+          "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+          "score": 0.3638
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "role": "executor",
+      "action": "tool",
+      "tool": "replay_case",
+      "arguments": {
+        "case_id": "config-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "config-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [
+            "config"
+          ],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.226400000130525,
+      "evidence": {
+        "config-0:logs": {
+          "evidence_id": "config-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "input length 32768 exceeds max_model_len 2048"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "config-0:metrics": {
+          "evidence_id": "config-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 32768,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.5,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8,
+              "max_model_len": 2048
+            }
+          }
+        },
+        "config-0:comparison": {
+          "evidence_id": "config-0:comparison",
+          "changed_conditions": {
+            "context_size": {
+              "before": 2048,
+              "after": 32768
+            },
+            "config": {
+              "before": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8
+              },
+              "after": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8,
+                "max_model_len": 2048
+              }
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.5,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "config-0:replay": {
+          "evidence_id": "config-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [
+            "config"
+          ],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        },
+        "doc-config": {
+          "id": "doc-config",
+          "title": "配置与输入长度排查笔记",
+          "url": "local://runbooks/config",
+          "text": "max_model_len context input length 配置 上下文。输入长度超过配置上限会请求失败。先核对实际输入、模型支持长度和服务上限，再调整输入长度，验证成功率与内存开销。",
+          "score": 2.4623
+        },
+        "doc-memory": {
+          "id": "doc-memory",
+          "title": "显存故障排查笔记",
+          "url": "local://runbooks/memory",
+          "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+          "score": 0.5185
+        },
+        "doc-latency": {
+          "id": "doc-latency",
+          "title": "延迟与排队排查笔记",
+          "url": "local://runbooks/latency",
+          "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+          "score": 0.3638
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "role": "executor",
+      "action": "tool",
+      "tool": "search_docs",
+      "arguments": {
+        "query": "max_model_len 上下文长度 请求失败 推理服务配置",
+        "top_k": 3
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "query": "max_model_len 上下文长度 请求失败 推理服务配置",
+          "rewritten_query": "max_model_len 上下文长度 请求失败 推理服务配置 context max_model_len",
+          "backend": "lexical_baseline",
+          "hits": [
+            {
+              "id": "doc-config",
+              "title": "配置与输入长度排查笔记",
+              "url": "local://runbooks/config",
+              "text": "max_model_len context input length 配置 上下文。输入长度超过配置上限会请求失败。先核对实际输入、模型支持长度和服务上限，再调整输入长度，验证成功率与内存开销。",
+              "score": 2.4623
+            },
+            {
+              "id": "doc-memory",
+              "title": "显存故障排查笔记",
+              "url": "local://runbooks/memory",
+              "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+              "score": 0.5185
+            },
+            {
+              "id": "doc-latency",
+              "title": "延迟与排队排查笔记",
+              "url": "local://runbooks/latency",
+              "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+              "score": 0.3638
+            }
+          ],
+          "empty": false
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.5369000033824705,
+      "evidence": {
+        "config-0:logs": {
+          "evidence_id": "config-0:logs",
+          "logs": [
+            {
+              "timestamp": "2026-01-01T00:00:01Z",
+              "level": "ERROR",
+              "message": "input length 32768 exceeds max_model_len 2048"
+            }
+          ],
+          "counts": {
+            "ERROR": 1
+          }
+        },
+        "config-0:metrics": {
+          "evidence_id": "config-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 32768,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 0.5,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8,
+              "max_model_len": 2048
+            }
+          }
+        },
+        "config-0:comparison": {
+          "evidence_id": "config-0:comparison",
+          "changed_conditions": {
+            "context_size": {
+              "before": 2048,
+              "after": 32768
+            },
+            "config": {
+              "before": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8
+              },
+              "after": {
+                "max_num_seqs": 16,
+                "gpu_memory_utilization": 0.8,
+                "max_model_len": 2048
+              }
+            }
+          },
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": -0.5,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "config-0:replay": {
+          "evidence_id": "config-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [
+            "config"
+          ],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        },
+        "doc-config": {
+          "id": "doc-config",
+          "title": "配置与输入长度排查笔记",
+          "url": "local://runbooks/config",
+          "text": "max_model_len context input length 配置 上下文。输入长度超过配置上限会请求失败。先核对实际输入、模型支持长度和服务上限，再调整输入长度，验证成功率与内存开销。",
+          "score": 2.4623
+        },
+        "doc-memory": {
+          "id": "doc-memory",
+          "title": "显存故障排查笔记",
+          "url": "local://runbooks/memory",
+          "text": "CUDA out of memory OOM 显存不足时先查看错误日志及显存峰值，检查并发、上下文长度与其他进程占用。降低并发后保持模型与输入不变重新测试，不能只凭显存高断定根因。",
+          "score": 0.5185
+        },
+        "doc-latency": {
+          "id": "doc-latency",
+          "title": "延迟与排队排查笔记",
+          "url": "local://runbooks/latency",
+          "text": "TTFT P95 延迟 排队 queue concurrency。并发增加、吞吐接近不变而延迟增大，提示排队或资源饱和。固定模型、设备、输入长度，对比并发；检查调度日志。",
+          "score": 0.3638
+        }
+      }
+    },
+    {
+      "seq": 8,
+      "role": "executor",
+      "action": "draft",
+      "output": {
+        "category": "config",
+        "conclusion": "根因候选：服务侧 max_model_len=2048 与提升后的输入上下文 32768 不一致，超限请求被拒绝。日志明确报错 input length 32768 exceeds max_model_len 2048；指标显示成功率由 1.0 降至 0.5（Δ-0.5），而 TTFT/E2E P95、吞吐、显存峰值均无变化，排除 OOM 与排队/饱和。comparison 判定 comparable=true，唯一相关变更为 context_size 2048→32768 且新增 max_model_len=2048。本次为离线规则重放，未启动推理服务、未产生新硬件测量数据。",
+        "evidence_ids": [
+          "config-0:logs",
+          "config-0:metrics",
+          "config-0:comparison",
+          "config-0:replay",
+          "doc-config"
+        ],
+        "recommendations": [
+          "将服务 max_model_len 提升至 ≥ 目标上下文（如 32768）或按模型实际支持上限设定",
+          "若受显存限制无法放大，则回退输入长度至 ≤2048",
+          "调整后重跑并核对成功率恢复及长上下文 KV cache 带来的显存峰值上升"
+        ],
+        "verification": [
+          "控制变量复测：仅修改 max_model_len，保持模型/设备/并发/输入不变，确认成功率回升",
+          "监控 gpu_memory_peak_mib 是否随上下文增大而上升，验证非资源瓶颈假设"
+        ],
+        "uncertainty": "配置变更与失败仅为相关性证据，因果需控制变量复测确认；当前为离线重放，无新硬件测量数据。"
+      }
+    },
+    {
+      "seq": 9,
+      "role": "system",
+      "action": "completed"
+    }
+  ],
+  "tools": [
+    "query_logs",
+    "query_metrics",
+    "compare_runs",
+    "replay_case",
+    "search_docs"
+  ],
+  "usage": [
+    {
+      "prompt_tokens": 889,
+      "completion_tokens": 99,
+      "estimated_cny": 0.0009785,
+      "duration_ms": 2026.8914000007499,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1547,
+      "completion_tokens": 100,
+      "estimated_cny": 0.0015076000000000002,
+      "duration_ms": 2478.566800000408,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 2027,
+      "completion_tokens": 378,
+      "estimated_cny": 0.0026422000000000004,
+      "duration_ms": 8440.506599999935,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 2867,
+      "completion_tokens": 365,
+      "estimated_cny": 0.0032791,
+      "duration_ms": 5623.4555000010005,
+      "attempt": 1
+    }
+  ],
+  "duration_ms": 19412.925999997242
+}

@@ -1,0 +1,667 @@
+{
+  "status": "completed",
+  "diagnosis": {
+    "category": "normal",
+    "conclusion": "根据现有证据，本次推理实验未发现异常。日志查询结果为空（无错误记录），性能指标显示当前运行与基线完全一致（所有关键指标差值为0.0），且配置未发生变更。虽然回放测试因离线模式未生成新数据，但基于已有的指标对比和日志状态，判定为正常。",
+    "evidence_ids": [
+      "normal-0:logs",
+      "normal-0:metrics",
+      "normal-0:comparison"
+    ],
+    "recommendations": [
+      "确认日志采集服务是否正常工作，因为日志返回为空可能意味着无错误也可能意味着采集失败。",
+      "若需进一步验证稳定性，建议在在线模式下重新执行回放以获取实时硬件测量数据。"
+    ],
+    "verification": [
+      "检查 normal-0:metrics 中 current 与 baseline 的 metrics 字段是否完全相等。",
+      "确认 normal-0:comparison 中的 deltas 是否全为 0.0。",
+      "核实 normal-0:logs 中 counts 是否为空或零，且无 error 字段。"
+    ],
+    "uncertainty": "日志为空可能存在两种情况：确实无错误或日志采集缺失。此外，replay 工具提示未启动推理服务，因此缺乏动态复测的直接证据，结论主要依赖静态指标对比。"
+  },
+  "report": {
+    "case_id": "normal-0",
+    "conclusion": "根据现有证据，本次推理实验未发现异常。日志查询结果为空（无错误记录），性能指标显示当前运行与基线完全一致（所有关键指标差值为0.0），且配置未发生变更。虽然回放测试因离线模式未生成新数据，但基于已有的指标对比和日志状态，判定为正常。",
+    "evidence_ids": [
+      "normal-0:logs",
+      "normal-0:metrics",
+      "normal-0:comparison"
+    ],
+    "recommendations": [
+      "确认日志采集服务是否正常工作，因为日志返回为空可能意味着无错误也可能意味着采集失败。",
+      "若需进一步验证稳定性，建议在在线模式下重新执行回放以获取实时硬件测量数据。"
+    ],
+    "synthetic": true,
+    "status": "candidate_diagnosis"
+  },
+  "evidence": {
+    "normal-0:logs": {
+      "evidence_id": "normal-0:logs",
+      "logs": [],
+      "counts": {}
+    },
+    "normal-0:metrics": {
+      "evidence_id": "normal-0:metrics",
+      "synthetic": true,
+      "baseline": {
+        "id": "baseline",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 2048,
+        "concurrency": 4,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 0.4,
+          "e2e_p95_seconds": 2.0,
+          "request_throughput_per_second": 4.0,
+          "success_rate": 1.0,
+          "gpu_memory_peak_mib": 9000.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8
+        }
+      },
+      "current": {
+        "id": "current",
+        "model": "demo-model",
+        "device": "demo-16GB",
+        "context_size": 2048,
+        "concurrency": 4,
+        "prompt_profile": "fixed",
+        "max_tokens": 128,
+        "metrics": {
+          "ttft_p95_seconds": 0.4,
+          "e2e_p95_seconds": 2.0,
+          "request_throughput_per_second": 4.0,
+          "success_rate": 1.0,
+          "gpu_memory_peak_mib": 9000.0
+        },
+        "config": {
+          "max_num_seqs": 16,
+          "gpu_memory_utilization": 0.8
+        }
+      }
+    },
+    "normal-0:comparison": {
+      "evidence_id": "normal-0:comparison",
+      "changed_conditions": {},
+      "deltas": {
+        "ttft_p95_seconds": 0.0,
+        "e2e_p95_seconds": 0.0,
+        "request_throughput_per_second": 0.0,
+        "success_rate": 0.0,
+        "gpu_memory_peak_mib": 0.0
+      },
+      "comparable": true,
+      "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+    },
+    "normal-0:replay": {
+      "evidence_id": "normal-0:replay",
+      "mode": "offline_rule_replay",
+      "observations": [],
+      "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+    }
+  },
+  "events": [
+    {
+      "seq": 1,
+      "role": "system",
+      "action": "running",
+      "mode": "multi"
+    },
+    {
+      "seq": 2,
+      "role": "planner",
+      "action": "plan",
+      "output": "针对 case_id=normal-0 的排查计划如下：\n\n1. **获取基础运行日志**\n   - **动作**：调用工具拉取该实验 ID 对应的完整执行日志（stdout/stderr）。\n   - **所需证据**：日志中是否存在 `ERROR`、`Exception`、`Timeout` 或进程非零退出码记录。\n\n2. **检查关键性能指标 (KPIs)**\n   - **动作**：查询推理服务的延迟 (Latency)、吞吐量 (Throughput) 及资源利用率 (CPU/GPU/Mem)。\n   - **所需证据**：指标是否在预设的正常阈值范围内，有无突增或骤降异常点。\n\n3. **验证输入输出数据完整性**\n   - **动作**：抽样检查请求入参格式及响应出参结构。\n   - **所需证据**：确认无空值、格式错误、截断或不符合 Schema 定义的数据。\n\n4. **对比历史基线数据**\n   - **动作**：将当前实验的关键指标与同配置的历史正常实验数据进行比对。\n   - **所需证据**：当前数据分布是否与历史基线一致，排除统计意义上的显著偏差。"
+    },
+    {
+      "seq": 3,
+      "role": "system",
+      "action": "mcp_connected",
+      "tools": [
+        "query_logs",
+        "query_metrics",
+        "compare_runs",
+        "replay_case",
+        "search_docs",
+        "generate_report"
+      ]
+    },
+    {
+      "seq": 4,
+      "role": "executor",
+      "action": "tool",
+      "tool": "query_logs",
+      "arguments": {
+        "case_id": "normal-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "normal-0:logs",
+          "logs": [],
+          "counts": {}
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.511799997795606,
+      "evidence": {
+        "normal-0:logs": {
+          "evidence_id": "normal-0:logs",
+          "logs": [],
+          "counts": {}
+        },
+        "normal-0:metrics": {
+          "evidence_id": "normal-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "normal-0:comparison": {
+          "evidence_id": "normal-0:comparison",
+          "changed_conditions": {},
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": 0.0,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "normal-0:replay": {
+          "evidence_id": "normal-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        }
+      }
+    },
+    {
+      "seq": 5,
+      "role": "executor",
+      "action": "tool",
+      "tool": "query_metrics",
+      "arguments": {
+        "case_id": "normal-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "normal-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.192500000295695,
+      "evidence": {
+        "normal-0:logs": {
+          "evidence_id": "normal-0:logs",
+          "logs": [],
+          "counts": {}
+        },
+        "normal-0:metrics": {
+          "evidence_id": "normal-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "normal-0:comparison": {
+          "evidence_id": "normal-0:comparison",
+          "changed_conditions": {},
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": 0.0,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "normal-0:replay": {
+          "evidence_id": "normal-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "role": "executor",
+      "action": "tool",
+      "tool": "compare_runs",
+      "arguments": {
+        "case_id": "normal-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "normal-0:comparison",
+          "changed_conditions": {},
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": 0.0,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.4960000011778902,
+      "evidence": {
+        "normal-0:logs": {
+          "evidence_id": "normal-0:logs",
+          "logs": [],
+          "counts": {}
+        },
+        "normal-0:metrics": {
+          "evidence_id": "normal-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "normal-0:comparison": {
+          "evidence_id": "normal-0:comparison",
+          "changed_conditions": {},
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": 0.0,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "normal-0:replay": {
+          "evidence_id": "normal-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "role": "executor",
+      "action": "tool",
+      "tool": "replay_case",
+      "arguments": {
+        "case_id": "normal-0"
+      },
+      "output": {
+        "ok": true,
+        "data": {
+          "evidence_id": "normal-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        },
+        "error": null,
+        "retryable": false
+      },
+      "duration_ms": 3.0810999996901955,
+      "evidence": {
+        "normal-0:logs": {
+          "evidence_id": "normal-0:logs",
+          "logs": [],
+          "counts": {}
+        },
+        "normal-0:metrics": {
+          "evidence_id": "normal-0:metrics",
+          "synthetic": true,
+          "baseline": {
+            "id": "baseline",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          },
+          "current": {
+            "id": "current",
+            "model": "demo-model",
+            "device": "demo-16GB",
+            "context_size": 2048,
+            "concurrency": 4,
+            "prompt_profile": "fixed",
+            "max_tokens": 128,
+            "metrics": {
+              "ttft_p95_seconds": 0.4,
+              "e2e_p95_seconds": 2.0,
+              "request_throughput_per_second": 4.0,
+              "success_rate": 1.0,
+              "gpu_memory_peak_mib": 9000.0
+            },
+            "config": {
+              "max_num_seqs": 16,
+              "gpu_memory_utilization": 0.8
+            }
+          }
+        },
+        "normal-0:comparison": {
+          "evidence_id": "normal-0:comparison",
+          "changed_conditions": {},
+          "deltas": {
+            "ttft_p95_seconds": 0.0,
+            "e2e_p95_seconds": 0.0,
+            "request_throughput_per_second": 0.0,
+            "success_rate": 0.0,
+            "gpu_memory_peak_mib": 0.0
+          },
+          "comparable": true,
+          "caution": "配置变化只是相关性，必须通过控制变量复测确认因果。"
+        },
+        "normal-0:replay": {
+          "evidence_id": "normal-0:replay",
+          "mode": "offline_rule_replay",
+          "observations": [],
+          "note": "没有启动推理服务，也没有生成新的硬件测量数据。"
+        }
+      }
+    },
+    {
+      "seq": 8,
+      "role": "executor",
+      "action": "draft",
+      "output": {
+        "category": "normal",
+        "conclusion": "根据现有证据，本次推理实验未发现异常。日志查询结果为空（无错误记录），性能指标显示当前运行与基线完全一致（所有关键指标差值为0.0），且配置未发生变更。虽然回放测试因离线模式未生成新数据，但基于已有的指标对比和日志状态，判定为正常。",
+        "evidence_ids": [
+          "normal-0:logs",
+          "normal-0:metrics",
+          "normal-0:comparison"
+        ],
+        "recommendations": [
+          "确认日志采集服务是否正常工作，因为日志返回为空可能意味着无错误也可能意味着采集失败。",
+          "若需进一步验证稳定性，建议在在线模式下重新执行回放以获取实时硬件测量数据。"
+        ],
+        "verification": [
+          "检查 normal-0:metrics 中 current 与 baseline 的 metrics 字段是否完全相等。",
+          "确认 normal-0:comparison 中的 deltas 是否全为 0.0。",
+          "核实 normal-0:logs 中 counts 是否为空或零，且无 error 字段。"
+        ],
+        "uncertainty": "日志为空可能存在两种情况：确实无错误或日志采集缺失。此外，replay 工具提示未启动推理服务，因此缺乏动态复测的直接证据，结论主要依赖静态指标对比。"
+      }
+    },
+    {
+      "seq": 9,
+      "role": "reviewer",
+      "action": "review",
+      "output": {
+        "category": "normal",
+        "conclusion": "根据现有证据，本次推理实验未发现异常。日志查询结果为空（无错误记录），性能指标显示当前运行与基线完全一致（所有关键指标差值为0.0），且配置未发生变更。虽然回放测试因离线模式未生成新数据，但基于已有的指标对比和日志状态，判定为正常。",
+        "evidence_ids": [
+          "normal-0:logs",
+          "normal-0:metrics",
+          "normal-0:comparison"
+        ],
+        "recommendations": [
+          "确认日志采集服务是否正常工作，因为日志返回为空可能意味着无错误也可能意味着采集失败。",
+          "若需进一步验证稳定性，建议在在线模式下重新执行回放以获取实时硬件测量数据。"
+        ],
+        "verification": [
+          "检查 normal-0:metrics 中 current 与 baseline 的 metrics 字段是否完全相等。",
+          "确认 normal-0:comparison 中的 deltas 是否全为 0.0。",
+          "核实 normal-0:logs 中 counts 是否为空或零，且无 error 字段。"
+        ],
+        "uncertainty": "日志为空可能存在两种情况：确实无错误或日志采集缺失。此外，replay 工具提示未启动推理服务，因此缺乏动态复测的直接证据，结论主要依赖静态指标对比。"
+      }
+    },
+    {
+      "seq": 10,
+      "role": "system",
+      "action": "completed"
+    }
+  ],
+  "tools": [
+    "query_logs",
+    "query_metrics",
+    "compare_runs",
+    "replay_case"
+  ],
+  "usage": [
+    {
+      "prompt_tokens": 154,
+      "completion_tokens": 253,
+      "estimated_cny": 0.0008063,
+      "duration_ms": 6127.669199999218,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1153,
+      "completion_tokens": 4,
+      "estimated_cny": 0.0009332,
+      "duration_ms": 1275.5643000018608,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1184,
+      "completion_tokens": 28,
+      "estimated_cny": 0.0010228000000000001,
+      "duration_ms": 2977.116299996851,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1264,
+      "completion_tokens": 17,
+      "estimated_cny": 0.0010571,
+      "duration_ms": 3868.5222000021895,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1316,
+      "completion_tokens": 28,
+      "estimated_cny": 0.0011283999999999999,
+      "duration_ms": 1676.6888999991352,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1629,
+      "completion_tokens": 29,
+      "estimated_cny": 0.0013815,
+      "duration_ms": 1533.0991000009817,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1783,
+      "completion_tokens": 29,
+      "estimated_cny": 0.0015047,
+      "duration_ms": 4874.086600000737,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1900,
+      "completion_tokens": 311,
+      "estimated_cny": 0.0023596999999999997,
+      "duration_ms": 6573.573900001065,
+      "attempt": 1
+    },
+    {
+      "prompt_tokens": 1176,
+      "completion_tokens": 311,
+      "estimated_cny": 0.0017805,
+      "duration_ms": 5381.422899998142,
+      "attempt": 1
+    }
+  ],
+  "duration_ms": 35169.31929999919
+}
